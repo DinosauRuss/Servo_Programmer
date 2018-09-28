@@ -1,0 +1,141 @@
+
+
+
+#include <Servo.h> 
+
+
+//-------------------------------------//
+// Measure available SRAM
+
+int freeRam () {
+  extern int __heap_start, *__brkval; 
+  int v; 
+  return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval); 
+}
+//------------------------------------//
+
+
+// Declare each servo object
+{% for tabName in list_of_names %}Servo {{tabName}};
+{% endfor %}
+// Array of servo objects, useful to iterate over
+Servo SERVO_ARR[] = { {% for tabName in list_of_names %}{{tabName}}, {% endfor %}};
+
+// Calculate number of servos
+byte NUM_SERVOS = sizeof(SERVO_ARR) / sizeof(Servo);
+
+// Time 'delay' between each servo position update
+const short INTERVAL = {{interval}};
+
+
+// Initialize servo position (value) arrays for each servo
+{% for tabName, array in zip(list_of_names,tweenerArrays) %}
+const byte {{tabName}}_arr[]PROGMEM = 
+{
+{{array}}
+};
+{% endfor %}
+// Calculate length of each value array
+const unsigned int ARRAY_LENGTH = sizeof({{list_of_names[0]}}_arr) / sizeof(byte);
+
+// Array of position(value) arrays, useful to iterate over 
+const byte* VALUES_ARRAY[] = { {% for tabName in list_of_names %}{{tabName}}_arr, {% endfor %}};
+
+// Button to start routine
+const byte BUTTON_PIN = {{button}};
+
+
+void routine(Servo arr_of_servos[], byte num_of_servos, const byte* arr_of_valueArrays[], short interval, unsigned int length)
+{
+  /*
+    Updates positions of all servos concurrently for entirety of the
+    routine length (all values in value arrays
+  */
+  unsigned long prev_millis = 0;
+  boolean routine_running = true;
+  int pos = 0;
+  
+  Serial.println(F("Inside the routine"));
+  
+  while (routine_running)
+  {
+    unsigned long current_millis = millis();
+    
+    if ((current_millis - prev_millis) > interval)
+    {
+      for (int i=0; i<num_of_servos; i++)
+      {
+        byte temp_byte = pgm_read_byte(&arr_of_valueArrays[i][pos]);
+        arr_of_servos[i].write(temp_byte);   
+        
+        Serial.print(temp_byte);
+        Serial.print(", ");
+      }
+      Serial.println();
+      pos++;
+      prev_millis = millis();
+    }
+  
+    if (pos == length)
+    {
+      pos = 0;
+      routine_running = false;
+      
+      // Add 1s delay at end of routine
+      unsigned long start_delay = millis();
+      while ((millis() - start_delay) < 1000)
+      {
+      }
+      
+      // Reset servos to initial position
+      for (byte i=0; i<num_of_servos; i++)
+      {
+        arr_of_servos[i].write(VALUES_ARRAY[i][0]);
+      }
+    
+      Serial.println(F("Routine has ended"));
+    }   
+  }
+}
+
+
+void setup() 
+{   
+  // Assign pin # to each servo and create array
+{% for pin, num in zip(pinNames, pinNums) %}  const byte {{pin}} = {{num}};
+{% endfor %}
+  const byte SERVO_PINS[] = { {% for pin in pinNames %}{{pin}}, {% endfor %}};
+
+  Serial.begin(9600);
+  Serial.println(F("Hello from the Microcontroller"));
+  
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
+
+  for (byte i; i<NUM_SERVOS; i++)
+  // Attach all servos and set to starting position
+  {
+    SERVO_ARR[i].attach(SERVO_PINS[i], 600, 2500);
+    SERVO_ARR[i].write(VALUES_ARRAY[i][0]);
+  }
+  
+  // Add 2s delay before loop starts
+  unsigned long start_delay = millis();
+  while ((millis() - start_delay) < 2000)
+  {
+  }
+  Serial.println(F("Goodbye"));
+} 
+ 
+ 
+void loop() 
+{  
+  static unsigned long prev_millis = millis();
+  unsigned long current_millis = millis();
+  
+  if ((digitalRead(BUTTON_PIN) == LOW))
+  {
+    Serial.println(F("Routine Started"));
+    routine(SERVO_ARR, NUM_SERVOS, VALUES_ARRAY, INTERVAL, ARRAY_LENGTH);
+    Serial.println(F("Exiting routine"));
+  }
+}
