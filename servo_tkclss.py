@@ -70,9 +70,7 @@ class MainApp():
 
 class SettingsPage(ttk.Frame):
     '''First tab w/ settings'''
-    
-    num_of_seconds = 0
-    num_of_sevos = 0
+
     plot_pages = []    # Used when outputting data
     millis = 15        # Delay between each inBetweener value
     
@@ -97,13 +95,17 @@ class SettingsPage(ttk.Frame):
             \n(1-360):')
         seconds_label.grid(padx=10, pady=15)
         
-        self.seconds_entry = ttk.Entry(self, width=5, justify=tk.RIGHT)
+        SettingsPage.num_of_seconds = tk.IntVar()
+        self.seconds_entry = ttk.Entry(self, width=5, justify=tk.RIGHT,
+            textvariable = SettingsPage.num_of_seconds)
         self.seconds_entry.grid(padx=25, pady=15, row=1, column=1)
         
         servo_total_label = ttk.Label(self, text='Number of servos (1-8)')
         servo_total_label.grid(padx=10, pady=15)
         
-        self.servo_total_entry = ttk.Entry(self, width=5, justify=tk.RIGHT)
+        SettingsPage.num_of_servos = tk.IntVar()
+        self.servo_total_entry = ttk.Entry(self, width=5, justify=tk.RIGHT,
+            textvariable = SettingsPage.num_of_servos)
         self.servo_total_entry.grid(padx=25, pady=15, row=2, column=1)
         
         self.generate_plots = ttk.Button(self, text='Generate Plots',
@@ -114,8 +116,11 @@ class SettingsPage(ttk.Frame):
         button_label = ttk.Label(self, text='Pin # of button')
         button_label.grid(padx=10, pady=15)
         
-        self.button_entry = ttk.Entry(self, width=5, justify=tk.RIGHT)
-        self.button_entry.grid(padx=25, pady=15, row=3, column=1)
+        self.button_num = tk.IntVar()
+        self.button_num.set('')
+        button_entry = ttk.Entry(self, width=5, justify=tk.RIGHT,
+            textvariable=self.button_num)
+        button_entry.grid(padx=25, pady=15, row=3, column=1)
         
         self.output_button = ttk.Button(self, text='Output Data', width=15,
             state='disabled', command=self.outputSketch)
@@ -126,13 +131,9 @@ class SettingsPage(ttk.Frame):
     def resetEntries(self):
         '''Clear the entry widgets'''
         
-        self.seconds_entry.delete(0, tk.END)
-        self.servo_total_entry.delete(0, tk.END)
+        SettingsPage.num_of_seconds.set(1)
+        SettingsPage.num_of_servos.set(1)
         
-        # Default values
-        self.seconds_entry.insert(0, 1)
-        self.servo_total_entry.insert(0, 1)
-
     def generatePlots(self):
         '''
         Generate specified number of Plot tabs each containing a plot
@@ -142,18 +143,19 @@ class SettingsPage(ttk.Frame):
         try:
             limit = lambda n, n_min, n_max: max(min(n, n_max), n_min)
             
-            # Routine between 1 and 600 seconds
-            SettingsPage.num_of_seconds = int(self.seconds_entry.get())
-            SettingsPage.num_of_seconds = limit(self.num_of_seconds, 1, 360)
+            # Routine between 1 and 360 seconds
+            temp_secs= SettingsPage.num_of_seconds.get()
+            SettingsPage.num_of_seconds.set(limit(temp_secs, 1, 360))
             
             # Maximum of 8 servos
-            SettingsPage.num_of_servos = int(self.servo_total_entry.get())
-            SettingsPage.num_of_servos = limit(self.num_of_servos, 1, 8)
+            temp_servos = SettingsPage.num_of_servos.get()
+            SettingsPage.num_of_servos.set(limit(temp_servos, 1, 8))
             
-            if (SettingsPage.num_of_servos * SettingsPage.num_of_seconds) > 360:
+            if (SettingsPage.num_of_servos.get() * \
+                    SettingsPage.num_of_seconds.get()) > 360:
+                self.resetEntries()
                 messagebox.showerror('Limit Error', 'Total routine length must \
                     be less than 6 minutes (360 seconds)')
-                self.resetEntries()
                 return
             
         except Exception as e:
@@ -163,7 +165,7 @@ class SettingsPage(ttk.Frame):
             
         else:
             # Generate tabs/plots
-            for i in range(self.num_of_servos):
+            for i in range(self.num_of_servos.get()):
                 tab_name = 'Servo{}'.format(i+1)
                 tab = 'self.{}_tab'.format(tab_name)
                 tab = PlotPage(self, tab_name)
@@ -183,10 +185,10 @@ class SettingsPage(ttk.Frame):
         
          # Verify all pin #s before doing anything else
         try:
-            pin = int(self.button_entry.get())
-        except ValueError:
+            pin = self.button_num.get()
+        except Exception:
             messagebox.showerror('Error!', 'Bad button pin #')
-            self.button_entry.delete(0, tk.END)
+            self.button_num.set('')
             return
         
         # Temporary data needed for template output
@@ -212,7 +214,7 @@ class SettingsPage(ttk.Frame):
         # Keys for template
         template_dict = {
             'list_of_names' : name_arr,
-            'interval' : self.millis,
+            'interval' : SettingsPage.millis,
             'tweenerArrays': tweener_arrays,
             'button' : pin,
             'pinNames' : pin_names,
@@ -227,14 +229,15 @@ class SettingsPage(ttk.Frame):
             with open(file_name, 'w') as outFile:
                 outFile.write(template_index.render(template_dict))
     
-    def inBetweeners(self, arr):
+    @classmethod
+    def inBetweeners(cls, arr):
         '''
         Divide raw datapoints evenly by millis interval
         for smooth servo movement 
         '''
         
         temp_arr = []
-        divisor = int(500/self.millis)
+        divisor = int(500/cls.millis)
         
         for index, value in enumerate(arr):
             try:
@@ -271,11 +274,12 @@ class PlotPage(ttk.Frame):
         
         # To scroll along the plot
         # Upper limit is seconds - half the length of the viewport of the plot
-        slider = ttk.Scale(self, orient=tk.HORIZONTAL, to=self.parent.num_of_seconds-10,
+        slider = ttk.Scale(self, orient=tk.HORIZONTAL,
+            to=self.parent.num_of_seconds.get()-10,
             length=self.parent.parent_notebook.winfo_width())
         
         # Plot class instance, bound to tab instance
-        self.plot = Plot(self, self.parent.num_of_seconds, slider, self.plot_num)
+        self.plot = Plot(self, self.parent.num_of_seconds.get(), slider, self.plot_num)
         
         # Drawing area for the graph
         canvas = FigureCanvasTkAgg(self.plot.fig, master=self)
