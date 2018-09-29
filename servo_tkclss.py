@@ -281,7 +281,9 @@ class Plot():
         self.point_index = None             # Track which node has been selected
         
         # For keeping values within range of servo degrees
-        self.limit_range = lambda n: max(min(180, n), 0)
+        self.upper_limit = 180
+        self.lower_limit = 0
+        self.limit_range = lambda n: max(min(self.upper_limit, n), self.lower_limit)
         
         # Initial Graph -----
         self.fig = Figure(figsize=(10,5), dpi=100)
@@ -328,8 +330,6 @@ class Plot():
     def onPress(self, event):
         '''Which node has been clicked'''
         
-        print('double', event.mouseevent.dblclick)
-        
         point = event.artist
         index = event.ind
         
@@ -341,7 +341,7 @@ class Plot():
         else:
             # If node is double-clicked open popup to change value
             time.sleep(.1)  # Needs short delay to end all events on mainloop
-            ValuePopup(self.parent.primary_tk_window)
+            ValuePopup(self, self.point_index, self.parent.primary_tk_window)
         
     def onMotion(self, event):
         if self.click and event.inaxes:
@@ -374,7 +374,7 @@ def prettyOutput(arr):
         else:
             tmp_str += '{},\n'.format(num).rjust(5)
     return tmp_str 
-    
+
 
 
 WIDTH = 1000
@@ -402,7 +402,7 @@ file_menu.add_command(label='Quit', command=main.destroy)
 about_menu = tk.Menu(main, tearoff=0)
 #~ about_menu.add_command(label='About',
     #~ command=lambda: messagebox.showinfo('About', 'Made by REK'))
-about_menu.add_command(label='About', command=aboutMenu)
+about_menu.add_command(label='About', command=lambda: AboutPopup(main))
 
 menubar.add_cascade(label='File', menu=file_menu)
 menubar.add_cascade(label='Help', menu=about_menu)

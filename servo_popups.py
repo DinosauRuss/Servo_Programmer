@@ -11,6 +11,7 @@ class Popup():
         self.dialog=tk.Toplevel(main_window)
         self.dialog.title(title)
         self.dialog.geometry(geometry)
+        self.dialog.resizable(False, False)
         
         self.buildPage()
         
@@ -98,21 +99,43 @@ class AboutPopup(Popup):
 class ValuePopup(Popup):
     '''Change value of individual node'''
     
-    def __init__(self, main_window, title='Change Value', geometry='250x125'):
+    def __init__(self, plot, node_index, main_window, title='Change Value', geometry='250x125'):
         super().__init__(main_window, title, geometry)
+        
+        self.plot = plot
+        self.index = node_index
         
     def buildPage(self):
         main_frame = ttk.Frame(self.dialog, padding=5)
         
         label = ttk.Label(main_frame, text='Enter a new value', font=(None, 12))
-        new_val = ttk.Entry(main_frame, width=8)
-        button = ttk.Button(main_frame, text='Close', command=self.close)
+        self.new_val_entry = ttk.Entry(main_frame, width=6)
+        self.new_val_entry.focus()
+        self.new_val_entry.bind('<Return>', self.update)
+        button = ttk.Button(main_frame, text='OK', command=self.update)
     
         main_frame.pack(fill=tk.BOTH, expand=1)
         
         label.pack(padx=5, pady=5)
-        new_val.pack(pady=5)
+        self.new_val_entry.pack(pady=5)
         button.pack(pady=5)
             
-    def close(self):
-        self.dialog.destroy()
+    def update(self, event=None):
+        
+        try:
+            new_value = int(self.new_val_entry.get())
+            self.plot.ys[self.index] = self.plot.limit_range(new_value)
+            self.plot.update()
+            
+        except Exception as e:
+            print('VAL ERROR: ', e)
+        
+        finally:
+            self.dialog.destroy()
+
+
+
+
+
+
+
