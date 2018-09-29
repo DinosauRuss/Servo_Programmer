@@ -11,6 +11,9 @@ import tkinter.filedialog as fd
 from tkinter import messagebox
 from tkinter.ttk import Notebook
 
+import time
+
+from servo_popups import *
 
 
 # Needed to embed matplotlib in tkinter
@@ -20,11 +23,13 @@ Use('TkAgg')
 class SettingsPage(ttk.Frame):
     '''First tab w/ settings'''
     
-    def __init__(self, parent_notebook, primary_tk_window):
+    def __init__(self, parent_notebook, primary_tk_window, template_file):
         super().__init__()
         
         self.parent_notebook = parent_notebook
         self.primary_tk_window = primary_tk_window  # Only needed to pass down to PlotPage
+        self.template_file = template_file          # For outputting sketch
+        
         self.num_of_seconds = 0
         self.num_of_sevos = 0
         self.plot_pages = []    # Used when outputting data
@@ -152,7 +157,7 @@ class SettingsPage(ttk.Frame):
         template_loader = jinja2.FileSystemLoader(searchpath='./')
         template_env = jinja2.Environment(loader=template_loader)
         template_env.globals.update(zip=zip)
-        template_index = template_env.get_template('template.txt')
+        template_index = template_env.get_template(self.template_file)
         
         # Keys for template
         template_dict = {
@@ -170,52 +175,6 @@ class SettingsPage(ttk.Frame):
             with open(file_name, 'w') as outFile:
                 outFile.write(template_index.render(template_dict))
 
-####################################
-    # Old function, does not use template
-    def AAAoutputSketchAAA(self):
-        '''Output all data into an Arduino sketch'''
-        
-        # Verify pin # before doing anything else
-        try:
-            pin = int(self.button_entry.get())
-        except ValueError:
-            messagebox.showerror('Error!', 'Bad pin #')
-            self.button_entry.delete(0, tk.END)
-            return
-                
-        file_name = fd.asksaveasfilename(defaultextension='.servo',\
-            title='Save Servo Settings', confirmoverwrite=True)
-    
-        if file_name:   # Prevents error if 'cancel' is pushed
-            with open(file_name, 'w') as outFile:
-                
-                
-                # Declare each servo in the output sketch
-                for tab in self.plot_pages:
-                    outFile.write('Servo {};\n'.format(tab.name.lower()))
-                outFile.write('\n')
-                    
-                # Output the array of values
-                for tab in self.plot_pages:
-                    
-                    #~ # Raw data points
-                    #~ output_list = prettyOutput(tab.plot.ys)
-                    #~ outFile.write('const int {}_vals = \n{{\n'.format(tab.name).lower())
-                    #~ outFile.write(output_list)
-                    #~ outFile.write('\n};\n\n')
-                    
-                    
-                    # Points calculated every MILLIS (global variable)
-                    tweener_output_list = self.inBetweeners(tab.plot.ys)
-                    output_list = prettyOutput(tweener_output_list)
-                    
-                    outFile.write('const byte {}_arr[]PROGMEM = \n{{\n'.format(tab.name.lower()))
-                    outFile.write(output_list)
-                    outFile.write('\n};\n\n')
-                
-                outFile.write('const byte BUTTON_PIN = {};\n'.format(pin))
-                outFile.write('const byte INTERVAL = {};\n\n'.format(self.millis))
-####################################
     
     def inBetweeners(self, arr):
         '''
@@ -297,8 +256,7 @@ class PlotPage(ttk.Frame):
         
         self.rename_button['state'] = 'disabled'
         
-        self.win = NamePopup(self, self.primary_tk_window)
-        self.primary_tk_window.wait_window(self.win.dialog)
+        NamePopup(self, self.primary_tk_window)
         
         self.rename_button['state'] = 'normal'
   
@@ -369,11 +327,21 @@ class Plot():
         
     def onPress(self, event):
         '''Which node has been clicked'''
+        
+        print('double', event.mouseevent.dblclick)
+        
         point = event.artist
         index = event.ind
         
-        self.click = True
         self.point_index = int(index[0])
+        
+        if not event.mouseevent.dblclick:
+            self.click = True
+        
+        else:
+            # If node is double-clicked open popup to change value
+            time.sleep(.1)  # Needs short delay to end all events on mainloop
+            ValuePopup(self.parent.primary_tk_window)
         
     def onMotion(self, event):
         if self.click and event.inaxes:
@@ -393,99 +361,8 @@ class Plot():
         '''Re-draw plot after moving a point'''
         self.ax.clear()
         self.drawPlot()
-        self.fig.canvas.draw()
-
-
-class Popup():
-    '''Generic top level pop-up window'''
-
-    def __init__(self, main_window, title='This is a Title', geometry='200x100'):
-        # Create new top-level window
-        self.dialog=tk.Toplevel(main_window)
-        self.dialog.title(title)
-        self.dialog.geometry(geometry)
+        self.fig.canvas.draw()        
         
-    def buildPage(self):
-        pass
-    
-    def update(self, event=None):
-        pass
-
-
-class NamePopup(Popup):
-    '''Used to change the name/title of each plot'''
-    
-    def __init__(self, page, main_window, title='Change Name', geometry='200x100'):
-        super().__init__(main_window, title, geometry)
-        
-        self.page = page
-        
-        self.buildPage()
-        
-    def buildPage(self):    
-        self.name_entry = ttk.Entry(self.dialog)
-        self.name_entry.focus()
-        self.name_entry.bind('<Return>', self.update)
-        
-        button_frame = ttk.Frame(self.dialog)
-        
-        ok_button = ttk.Button(button_frame, text='Ok',width=5, 
-            command=self.update)
-        cancel_button = ttk.Button(button_frame, text='Cancel', width=5,
-            command=self.dialog.destroy)
-        
-        self.name_entry.pack(pady=15)
-        button_frame.pack()
-        ok_button.pack(side=tk.LEFT, padx=3)
-        cancel_button.pack(side=tk.RIGHT, padx=3)
-        
-    def update(self, event=None):
-        '''Update plot title and tab text, close popup'''
-        
-        name = str(self.name_entry.get()).replace(' ', '')
-        
-        for tab in self.page.parent.plot_pages:
-            if name == tab.name:
-                messagebox.showerror('Error!', 'Names must be unique')
-                self.dialog.destroy()
-                return
-        if name:
-            self.page.parent_notebook.tab(self.page.plot_num, text=name)
-            self.page.name = name
-            self.page.plot.update()
-            self.dialog.destroy()    
-        else:
-            self.dialog.destroy()
-
-
-class AboutPopup(Popup):
-    def __init__(self, main_window, title='About', geometry='200x100'):
-        super().__init__(main_window, title, geometry)
-        
-        self.buildPage()
-        
-    def buildPage(self):
-        
-        main_frame = ttk.Frame(self.dialog)
-        
-        title = ttk.Label(main_frame, text='Made by REK', font=(None, 14))
-        title.pack(expand=1)
-        
-        button_frame = ttk.Frame(main_frame)
-        
-        help_button = ttk.Button(button_frame, text='Help')
-        ok_button = ttk.Button(button_frame, text='OK', command=self.close)
-        
-        main_frame.pack(fill=tk.BOTH, expand=1)
-        help_button.pack(padx=5, side=tk.LEFT)
-        ok_button.pack(padx=5, side=tk.RIGHT)
-        button_frame.pack(side=tk.BOTTOM, pady=10)
-    
-    def close(self):
-        self.dialog.destroy()
-
-
-
 
 def prettyOutput(arr):
     '''Outputs the plot values array in more human readable form'''
@@ -496,17 +373,13 @@ def prettyOutput(arr):
             tmp_str += '{}, '.format(num).rjust(5)
         else:
             tmp_str += '{},\n'.format(num).rjust(5)
-    return tmp_str
-    
-def aboutMenu(*args):
-    win = AboutPopup(main, title='This is an About Menu',
-        geometry='400x200')
- 
+    return tmp_str 
     
 
 
 WIDTH = 1000
 HEIGHT = 600
+TEMPLATE_FILE = 'pin_template.txt'
 
 main = tk.Tk()
 main.title('Servo Programmer')
@@ -543,7 +416,7 @@ notebook = Notebook(main, width=WIDTH, height=HEIGHT)
 
 # Initial tab -----
 #~ settings_tab = SettingsPage(notebook)
-settings_tab = SettingsPage(notebook, main)
+settings_tab = SettingsPage(notebook, main, TEMPLATE_FILE)
 notebook.add(settings_tab, text='Settings')
 
 notebook.pack(anchor=tk.CENTER, fill=tk.BOTH)
