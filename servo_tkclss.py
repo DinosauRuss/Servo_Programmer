@@ -16,6 +16,8 @@ from tkinter.ttk import Notebook
 
 from servo_popups import *
 
+import dill
+
 
 # Needed to embed matplotlib in tkinter
 Use('TkAgg')
@@ -69,19 +71,20 @@ class MainApp():
 class SettingsPage(ttk.Frame):
     '''First tab w/ settings'''
     
+    num_of_seconds = 0
+    num_of_sevos = 0
+    plot_pages = []    # Used when outputting data
+    millis = 15        # Delay between each inBetweener value
+    
     def __init__(self, parent_notebook, template_file):
         super().__init__()
         
-        self.parent_notebook = parent_notebook
-        
         # Pass down to PlotPage for popup window
-        self.template_file = template_file  # For outputting sketch
+        SettingsPage.template_file = template_file  # For outputting sketch
         
-        self.num_of_seconds = 0
-        self.num_of_sevos = 0
-        self.plot_pages = []    # Used when outputting data
-        self.millis = 15        # Delay between each inBetweener value
-        
+        SettingsPage.parent_notebook = parent_notebook
+
+
         self.buildPage()
         
     def buildPage(self):
@@ -140,14 +143,14 @@ class SettingsPage(ttk.Frame):
             limit = lambda n, n_min, n_max: max(min(n, n_max), n_min)
             
             # Routine between 1 and 600 seconds
-            self.num_of_seconds = int(self.seconds_entry.get())
-            self.num_of_seconds = limit(self.num_of_seconds, 1, 360)
+            SettingsPage.num_of_seconds = int(self.seconds_entry.get())
+            SettingsPage.num_of_seconds = limit(self.num_of_seconds, 1, 360)
             
             # Maximum of 8 servos
-            self.num_of_servos = int(self.servo_total_entry.get())
-            self.num_of_servos = limit(self.num_of_servos, 1, 8)
+            SettingsPage.num_of_servos = int(self.servo_total_entry.get())
+            SettingsPage.num_of_servos = limit(self.num_of_servos, 1, 8)
             
-            if (self.num_of_servos * self.num_of_seconds) > 360:
+            if (SettingsPage.num_of_servos * SettingsPage.num_of_seconds) > 360:
                 messagebox.showerror('Limit Error', 'Total routine length must \
                     be less than 6 minutes (360 seconds)')
                 self.resetEntries()
@@ -163,10 +166,9 @@ class SettingsPage(ttk.Frame):
             for i in range(self.num_of_servos):
                 tab_name = 'Servo{}'.format(i+1)
                 tab = 'self.{}_tab'.format(tab_name)
-                tab = PlotPage(self.parent_notebook, self, tab_name,
-                    self.num_of_seconds)
-                self.parent_notebook.add(tab, text=tab_name)
-                self.plot_pages.append(tab)
+                tab = PlotPage(self, tab_name)
+                SettingsPage.parent_notebook.add(tab, text=tab_name)
+                SettingsPage.plot_pages.append(tab)
             
             self.generate_plots.configure(state='disabled')
             self.seconds_entry.configure(state='disabled')
@@ -188,12 +190,12 @@ class SettingsPage(ttk.Frame):
             return
         
         # Temporary data needed for template output
-        name_arr = [tab.name for tab in self.plot_pages]
+        name_arr = [tab.name for tab in SettingsPage.plot_pages]
         tweener_arrays = [
-            prettyOutput(self.inBetweeners(tab.plot.ys)) for tab in self.plot_pages]
-        pin_names = ['{}_PIN'.format(tab.name) for tab in self.plot_pages]
+            prettyOutput(self.inBetweeners(tab.plot.ys)) for tab in SettingsPage.plot_pages]
+        pin_names = ['{}_PIN'.format(tab.name) for tab in SettingsPage.plot_pages]
         try:    # Each servo must have pin number assigned
-            pin_nums = [int(tab.pin_entry.get()) for tab in self.plot_pages]
+            pin_nums = [int(tab.pin_entry.get()) for tab in SettingsPage.plot_pages]
             if len(pin_nums) != len(set(pin_nums)):
                 raise ValueError
         except ValueError:
@@ -205,7 +207,7 @@ class SettingsPage(ttk.Frame):
             searchpath=os.path.join(os.path.dirname(__file__)))
         template_env = jinja2.Environment(loader=template_loader)
         template_env.globals.update(zip=zip)
-        template_index = template_env.get_template(self.template_file)
+        template_index = template_env.get_template(SettingsPage.template_file)
         
         # Keys for template
         template_dict = {
@@ -250,14 +252,12 @@ class PlotPage(ttk.Frame):
     
     total_pages = 0
     
-    def __init__(self, parent_notebook, parent, name, seconds):
+    def __init__(self, parent, name):
         super().__init__()
         
         PlotPage.total_pages += 1
-        PlotPage.num_of_seconds = seconds
         
         self.plot_num = PlotPage.total_pages
-        self.parent_notebook = parent_notebook
         self.parent = parent
         self.name = name
 
@@ -271,11 +271,11 @@ class PlotPage(ttk.Frame):
         
         # To scroll along the plot
         # Upper limit is seconds - half the length of the viewport of the plot
-        slider = ttk.Scale(self, orient=tk.HORIZONTAL, to=PlotPage.num_of_seconds-10,
-            length=self.parent_notebook.winfo_width())
+        slider = ttk.Scale(self, orient=tk.HORIZONTAL, to=self.parent.num_of_seconds-10,
+            length=self.parent.parent_notebook.winfo_width())
         
         # Plot class instance, bound to tab instance
-        self.plot = Plot(self, PlotPage.num_of_seconds, slider, self.plot_num)
+        self.plot = Plot(self, self.parent.num_of_seconds, slider, self.plot_num)
         
         # Drawing area for the graph
         canvas = FigureCanvasTkAgg(self.plot.fig, master=self)
@@ -423,6 +423,15 @@ def prettyOutput(arr):
         else:
             tmp_str += '{},\n'.format(num).rjust(5)
     return tmp_str 
+
+
+def saver():
+    info_dict = {
+                 'seconds' : SettingsPage.num_of_seconds,
+                 'plot_pages' : [['title', 'pin #', 'ys']]
+                }
+
+#~ for i in 
 
 
 

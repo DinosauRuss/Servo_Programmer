@@ -62,7 +62,7 @@ class NamePopup(Popup):
                 self.dialog.destroy()
                 return
         if name:
-            self.page.parent_notebook.tab(self.page.plot_num, text=name)
+            self.page.parent.parent_notebook.tab(self.page.plot_num, text=name)
             self.page.name = name
             self.page.plot.update()
             self.dialog.destroy()    
