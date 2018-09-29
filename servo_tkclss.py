@@ -11,6 +11,7 @@ import tkinter.filedialog as fd
 from tkinter import messagebox
 from tkinter.ttk import Notebook
 
+import os
 import time
 
 from servo_popups import *
@@ -19,6 +20,51 @@ from servo_popups import *
 # Needed to embed matplotlib in tkinter
 Use('TkAgg')
 
+
+class MainApp():
+    def __init__(self, template_file, width=800, height=600):
+        
+        self.template_file = template_file
+        
+        self.main = tk.Tk()
+        self.main.title('Servo Programmer')
+        self.main.geometry('{}x{}'.format(width, height))
+        self.main.resizable(False, False)
+        self.main.update()
+        
+        # Set ttk style
+        self.main.style = ttk.Style()
+        self.main.style.theme_use('clam')
+        
+        self.buildPage()
+        
+    def buildPage(self):
+        # ----- Meubar configuration -----
+        menubar = tk.Menu(self.main)
+        
+        file_menu = tk.Menu(menubar, tearoff=0)
+        file_menu.add_command(label='Open', command=None)
+        file_menu.add_command(label='Quit', command=self.main.destroy)
+        
+        about_menu = tk.Menu(self.main, tearoff=0)
+        about_menu.add_command(label='About', command=lambda: AboutPopup(self.main))
+        
+        menubar.add_cascade(label='File', menu=file_menu)
+        menubar.add_cascade(label='Help', menu=about_menu)
+        
+        # Add menubar to main window
+        self.main.config(menu=menubar)
+        
+        # ----- Notebook/tab configuration -----    
+        notebook = Notebook(self.main, width=self.main.winfo_width(),
+            height=self.main.winfo_height())
+        
+        # Initial tab -----
+        settings_tab = SettingsPage(notebook, self.main, self.template_file)
+        notebook.add(settings_tab, text='Settings')
+        
+        notebook.pack(anchor=tk.CENTER, fill=tk.BOTH)
+        
 
 class SettingsPage(ttk.Frame):
     '''First tab w/ settings'''
@@ -154,7 +200,8 @@ class SettingsPage(ttk.Frame):
             return
         
         # Stuff for jinja2 template
-        template_loader = jinja2.FileSystemLoader(searchpath='./')
+        template_loader = jinja2.FileSystemLoader(
+            searchpath=os.path.join(os.path.dirname(__file__)))
         template_env = jinja2.Environment(loader=template_loader)
         template_env.globals.update(zip=zip)
         template_index = template_env.get_template(self.template_file)
@@ -168,7 +215,9 @@ class SettingsPage(ttk.Frame):
             'pinNames' : pin_names,
             'pinNums' : pin_nums}
     
-        file_name = fd.asksaveasfilename(defaultextension='.ino',\
+        file_name = fd.asksaveasfilename(
+            initialdir=os.path.join(os.path.dirname(__file__)),
+            defaultextension='.ino',
             title='Save Servo Settings', confirmoverwrite=True)
     
         if file_name:   # Prevents error if 'cancel' is pushed
@@ -381,48 +430,10 @@ WIDTH = 1000
 HEIGHT = 600
 TEMPLATE_FILE = 'pin_template.txt'
 
-main = tk.Tk()
-main.title('Servo Programmer')
-main.geometry('{}x{}'.format(WIDTH, HEIGHT))
-main.resizable(False, False)
-main.update()
-
-# Set ttk style
-main.style = ttk.Style()
-main.style.theme_use('clam')
-
-
-# ----- Meubar configuration -----
-menubar = tk.Menu(main)
-
-file_menu = tk.Menu(menubar, tearoff=0)
-file_menu.add_command(label='Open', command=None)
-file_menu.add_command(label='Quit', command=main.destroy)
-
-about_menu = tk.Menu(main, tearoff=0)
-#~ about_menu.add_command(label='About',
-    #~ command=lambda: messagebox.showinfo('About', 'Made by REK'))
-about_menu.add_command(label='About', command=lambda: AboutPopup(main))
-
-menubar.add_cascade(label='File', menu=file_menu)
-menubar.add_cascade(label='Help', menu=about_menu)
-
-# Add menubar to main window
-main.config(menu=menubar)
-
-
-# ----- Notebook/tab configuration -----    
-notebook = Notebook(main, width=WIDTH, height=HEIGHT)
-
-# Initial tab -----
-#~ settings_tab = SettingsPage(notebook)
-settings_tab = SettingsPage(notebook, main, TEMPLATE_FILE)
-notebook.add(settings_tab, text='Settings')
-
-notebook.pack(anchor=tk.CENTER, fill=tk.BOTH)
-
-
-
-main.mainloop()
-
-
+if __name__ == '__main__':
+    app = MainApp(TEMPLATE_FILE, WIDTH, HEIGHT)
+    app.main.mainloop()
+    
+    
+    
+    
