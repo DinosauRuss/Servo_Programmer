@@ -5,16 +5,18 @@ from matplotlib import use as Use
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
-import os
-import time
-
 import tkinter as tk
 import tkinter.ttk as ttk
 import tkinter.filedialog as fd
 from tkinter import messagebox
 from tkinter.ttk import Notebook
 
+import os
+import time
+
 from servo_popups import *
+
+import dill
 
 
 # Needed to embed matplotlib in tkinter
@@ -56,26 +58,25 @@ class MainApp():
         self.main.config(menu=menubar)
         
         # ----- Notebook/tab configuration -----    
-        notebook = Notebook(self.main, width=self.main.winfo_width(),
+        self.notebook = Notebook(self.main, width=self.main.winfo_width(),
             height=self.main.winfo_height())
         
         # Initial tab -----
-        settings_tab = SettingsPage(notebook, self.template_file)
-        notebook.add(settings_tab, text='Settings')
+        settings_tab = SettingsPage(self, self.notebook, self.template_file)
+        self.notebook.add(settings_tab, text='Settings')
         
-        notebook.pack(anchor=tk.CENTER, fill=tk.BOTH)
+        self.notebook.pack(anchor=tk.CENTER, fill=tk.BOTH)
         
 
 class SettingsPage(ttk.Frame):
     '''First tab w/ settings'''
     
-    def __init__(self, parent_notebook, template_file):
+    def __init__(self, parent_obj, parent_notebook, template_file):
         super().__init__()
         
+        self.parent_obj = parent_obj
         self.parent_notebook = parent_notebook
-        
-        # Pass down to PlotPage for popup window
-        self.template_file = template_file  # For outputting sketch
+        self.template_file = template_file          # For outputting sketch
         
         self.num_of_seconds = 0
         self.num_of_sevos = 0
@@ -119,6 +120,20 @@ class SettingsPage(ttk.Frame):
         self.output_button.grid(padx=10, pady=50)
 
         self.resetEntries()
+        
+        saver = ttk.Button(self, text='save', command=self.saver)
+        opener = ttk.Button(self, text='open', command = self.opener)
+        saver.grid()
+        opener.grid()
+    
+    def saver(self):
+        print(self.plot_pages)
+        with open('testing.servo', 'wb') as writer:
+            dill.dump(self.parent_notebook.tabs, writer)
+        
+    def opener(self):
+        pass
+             
 
     def resetEntries(self):
         '''Clear the entry widgets'''
@@ -172,7 +187,7 @@ class SettingsPage(ttk.Frame):
             self.seconds_entry.configure(state='disabled')
             self.servo_total_entry.configure(state='disabled')
             self.output_button['state'] = 'normal'
-    
+            
     def outputSketch(self):
         '''
         Output all data into a usable Arduino sketch
@@ -330,9 +345,9 @@ class Plot():
         self.point_index = None             # Track which node has been selected
         
         # For keeping values within range of servo degrees
-        self.upper_limit = 180
-        self.lower_limit = 0
-        self.limit_range = lambda n: max(min(self.upper_limit, n), self.lower_limit)
+        upper_limit = 180
+        lower_limit = 0
+        self.limit_range = lambda n: max(min(upper_limit, n), lower_limit)
         
         # Initial Graph -----
         self.fig = Figure(figsize=(10,5), dpi=100)
@@ -431,7 +446,6 @@ HEIGHT = 600
 TEMPLATE_FILE = 'pin_template.txt'
 
 if __name__ == '__main__':
-    
     app = MainApp(TEMPLATE_FILE, WIDTH, HEIGHT)
     app.main.mainloop()
     

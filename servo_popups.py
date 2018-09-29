@@ -6,9 +6,9 @@ from tkinter import ttk
 class Popup():
     '''Generic top level pop-up window'''
 
-    def __init__(self, main_window, title='This is a Title', geometry='200x100'):
+    def __init__(self, title='This is a Title', geometry='200x100'):
         # Create new top-level window
-        self.dialog=tk.Toplevel(main_window)
+        self.dialog=tk.Toplevel()
         self.dialog.title(title)
         self.dialog.geometry(geometry)
         self.dialog.resizable(False, False)
@@ -29,8 +29,8 @@ class Popup():
 class NamePopup(Popup):
     '''Change the name/title of plot and tab'''
     
-    def __init__(self, page, main_window, title='Change Name', geometry='200x100'):
-        super().__init__(main_window, title, geometry)
+    def __init__(self, page, title='Change Name', geometry='200x100'):
+        super().__init__(title, geometry)
         
         self.page = page
         
@@ -73,8 +73,8 @@ class NamePopup(Popup):
 class AboutPopup(Popup):
     '''Popup window for the menubar'''
     
-    def __init__(self, main_window, title='About', geometry='200x100'):
-        super().__init__(main_window, title, geometry)
+    def __init__(self, title='About', geometry='200x100'):
+        super().__init__(title, geometry)
         
     def buildPage(self):
         main_frame = ttk.Frame(self.dialog)
@@ -99,8 +99,8 @@ class AboutPopup(Popup):
 class ValuePopup(Popup):
     '''Change value of individual node'''
     
-    def __init__(self, plot, node_index, main_window, title='Change Value', geometry='250x125'):
-        super().__init__(main_window, title, geometry)
+    def __init__(self, plot, node_index, title='Change Value', geometry='250x125'):
+        super().__init__(title, geometry)
         
         self.plot = plot
         self.index = node_index
