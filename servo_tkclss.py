@@ -85,55 +85,102 @@ class SettingsPage(ttk.Frame):
     def buildPage(self):
         '''Layout widgets for the tab'''
         
-        title = ttk.Label(self, text='Settings Page', font=(None, 25))
-        title.grid(columnspan=5, pady=20)
+        # --- Left side Frame ---
+        left = ttk.Frame(self)
+        left.pack(side=tk.LEFT, anchor=tk.N)
+        
+        l_title = ttk.Label(left, text='Settings', font=(None, 25))
+        l_title.grid(columnspan=5, pady=20)
                 
-        seconds_label = ttk.Label(self, text='Routine length (in seconds)\
+        seconds_label = ttk.Label(left, text='Routine length (in seconds)\
             \n(1-360):')
         seconds_label.grid(padx=10, pady=15)
         
         SettingsPage.num_of_seconds = tk.IntVar()
-        self.seconds_entry = ttk.Entry(self, width=5, justify=tk.RIGHT,
+        self.seconds_entry = ttk.Entry(left, width=5, justify=tk.RIGHT,
             textvariable = SettingsPage.num_of_seconds)
         self.seconds_entry.grid(padx=25, pady=15, row=1, column=1)
         
         
-        servo_total_label = ttk.Label(self, text='Number of servos (1-8)')
+        servo_total_label = ttk.Label(left, text='Number of servos (1-8)')
         servo_total_label.grid(padx=10, pady=15)
         
         SettingsPage.num_of_servos = tk.IntVar()
-        self.servo_total_entry = ttk.Entry(self, width=5, justify=tk.RIGHT,
+        self.servo_total_entry = ttk.Entry(left, width=5, justify=tk.RIGHT,
             textvariable = SettingsPage.num_of_servos)
         self.servo_total_entry.grid(padx=25, pady=15, row=2, column=1)
         
         
-        self.generate_plots = ttk.Button(self, text='Generate Plots',
+        self.generate_plots = ttk.Button(left, text='Generate Plots',
             command=self.generatePlots)
         self.generate_plots.grid(padx=25, pady=25, row=1, column=2,
             rowspan=2)
         
-        
-        button_label = ttk.Label(self, text='Pin # of button')
+        button_label = ttk.Label(left, text='Pin # of button')
         button_label.grid(padx=10, pady=15)
         
         SettingsPage.button_num = tk.IntVar()
-        SettingsPage.button_num.set('')
-        button_entry = ttk.Entry(self, width=5, justify=tk.RIGHT,
+        button_entry = ttk.Entry(left, width=5, justify=tk.RIGHT,
             textvariable=SettingsPage.button_num)
         button_entry.grid(padx=25, pady=15, row=3, column=1)
         
         
-        self.output_button = ttk.Button(self, text='Output Sketch', width=15,
+        # --- Right side Frame ---
+        right = ttk.Frame(self)
+        right.pack(anchor=tk.CENTER)
+        
+        r_title = ttk.Label(right, text='Output', font=(None, 25))
+        r_title.grid(columnspan=5, pady=20)
+        
+        self.output_button = ttk.Button(right, text='Output Sketch', width=15,
             state='disabled', command=self.outputSketch)
         self.output_button.grid(padx=10, pady=50)
+        
+        save_button = ttk.Button(right, text='Save', command=SettingsPage.saver)
+        save_button.grid()
+
+        load_button = ttk.Button(
+            right,
+            text='Load',
+            command=lambda: SettingsPage.loader(self))
+        load_button.grid()
+
+
+
+        ### TESTING
+        btn = ttk.Button(
+            right,
+            text='print info',
+            command=SettingsPage.printStuff)
+        btn.grid()
+        #####
+
 
         self.resetEntries()
-
-    def resetEntries(self):
+    
+    # TESTING
+    @classmethod
+    def printStuff(cls):
+        print()
+        print('Button num: {}'.format(cls.button_num.get()))
+        print('Length (sec) :', cls.num_of_seconds.get())
+        print('Pages:')
+        for page in cls.plot_pages:
+           print('Name: ', page.name)
+           print('Pin num: ', page.pin_num.get())
+           print('Y-value list: ', page.plot.ys)
+           print()
+           
+            
+    
+    
+    @classmethod
+    def resetEntries(cls):
         '''Clear the entry widgets'''
         
-        SettingsPage.num_of_seconds.set(1)
-        SettingsPage.num_of_servos.set(1)
+        cls.num_of_seconds.set(1)
+        cls.num_of_servos.set(1)
+        cls.button_num.set(0)
         
     def generatePlots(self):
         '''
@@ -183,7 +230,7 @@ class SettingsPage(ttk.Frame):
         Output all data into a usable Arduino sketch
         using jinja2 template
         '''
-        
+
          # Verify all pin #s before doing anything else
         try:
             pin = self.button_num.get()
@@ -198,7 +245,7 @@ class SettingsPage(ttk.Frame):
             prettyOutput(self.inBetweeners(tab.plot.ys)) for tab in SettingsPage.plot_pages]
         pin_names = ['{}_PIN'.format(tab.name) for tab in SettingsPage.plot_pages]
         try:    # Each servo must have pin number assigned
-            pin_nums = [int(tab.pin_entry.get()) for tab in SettingsPage.plot_pages]
+            pin_nums = [int(tab.pin_num.get()) for tab in SettingsPage.plot_pages]
             if len(pin_nums) != len(set(pin_nums)):
                 raise ValueError
         except ValueError:
@@ -224,7 +271,8 @@ class SettingsPage(ttk.Frame):
         file_name = fd.asksaveasfilename(
             initialdir=os.path.join(os.path.dirname(__file__)),
             defaultextension='.ino',
-            title='Save Servo Settings', confirmoverwrite=True)
+            title='Save Sketch',
+            confirmoverwrite=True)
     
         if file_name:   # Prevents error if 'cancel' is pushed
             with open(file_name, 'w') as outFile:
@@ -233,7 +281,7 @@ class SettingsPage(ttk.Frame):
     @classmethod
     def inBetweeners(cls, arr):
         '''
-        Divide raw datapoints evenly by millis interval
+        Divide raw datapoints linearly by millis interval
         for smooth servo movement 
         '''
         
@@ -250,6 +298,70 @@ class SettingsPage(ttk.Frame):
         
         return temp_arr
     
+    @classmethod
+    def saver(cls):
+        '''Save relevent info to file for later use'''
+    
+        try:
+            info_dict = {
+                         'seconds' : cls.num_of_seconds.get(),
+                         'plot_pages' : [],
+                         'button_#' : cls.button_num.get()
+                        }
+        
+            for page in cls.plot_pages:
+                temp = []
+                temp.append(page.name)
+                temp.append(page.pin_num.get())
+                temp.append(page.plot.ys)
+            
+                info_dict['plot_pages'].append(temp)
+            
+            file_name = fd.asksaveasfilename(
+                initialdir=os.path.join(os.path.dirname(__file__)),
+                defaultextension='.servo',
+                title='Save Settings',
+                confirmoverwrite=True)
+            
+            if file_name:   # Prevents error if cancel pressed
+                with open(file_name, 'wb') as writer:
+                    dill.dump(info_dict, writer)
+            
+            #~ for k, v in info_dict.items():
+                #~ print(k, ':', v)
+        
+        except Exception as e:
+            print('some error')
+            print(e)
+
+    @classmethod
+    def loader(cls, self):
+        '''Loads data from previous save'''
+        
+        file_name = fd.askopenfilename(
+                initialdir=os.path.join(os.path.dirname(__file__)),
+                defaultextension='.servo',
+                title='Load Settings')
+            
+        if file_name:
+            with open(file_name, 'rb') as reader:
+                settings = dill.load(reader)
+            
+            # Apply loaded data to current app
+            cls.button_num.set(settings['button_#'])
+            cls.num_of_seconds.set(settings['seconds'])
+            cls.num_of_servos.set(len(settings['plot_pages']))
+            
+            cls.generatePlots(self)
+            
+            temp_page_list = settings['plot_pages']
+            for index, page in enumerate(cls.plot_pages):
+                page.name = temp_page_list[index][0]
+                page.pin_num.set(temp_page_list[index][1])
+                page.plot.ys = temp_page_list[index][2]
+                page.plot.update()
+                page.parent.parent_notebook.tab(index+1, text=page.name)
+                
     
 class PlotPage(ttk.Frame):
     '''Tab containing interactive plot'''
@@ -289,7 +401,12 @@ class PlotPage(ttk.Frame):
         
         pin_assign_frame = ttk.Frame(self, padding=10)
         pin_label = ttk.Label(pin_assign_frame, text='Pin # or address: ')
-        self.pin_entry = ttk.Entry(pin_assign_frame, width=5, justify=tk.RIGHT)
+        self.pin_num = tk.IntVar()
+        self.pin_entry = ttk.Entry(
+            pin_assign_frame,
+            width=5,
+            justify=tk.RIGHT,
+            textvariable=self.pin_num)
         
         self.rename_button = ttk.Button(self, text='Change servo name',
             command=self.changeName)
@@ -431,23 +548,7 @@ def prettyOutput(arr):
     return tmp_str 
 
 
-def saver():
-    '''Save relevent info to file for later use'''
-    
-    info_dict = {
-                 'seconds' : SettingsPage.num_of_seconds.get(),
-                 'plot_pages' : [],
-                 'button #' : SettingsPage.button_num.get()
-                }
 
-    for page in SettingsPage.plot_pages:
-        temp = []
-        temp.append(page.name)
-        temp.append(page.pin_entry.get())
-        temp.append(page.plot.ys)
-    
-        info_dict['plot_pages'].append(temp)
-    print(info_dict)
     
 
 
