@@ -135,7 +135,3 @@ class ValuePopup(Popup):
 
 
 
-
-
-
-

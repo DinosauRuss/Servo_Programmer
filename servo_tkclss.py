@@ -77,11 +77,8 @@ class SettingsPage(ttk.Frame):
     def __init__(self, parent_notebook, template_file):
         super().__init__()
         
-        # Pass down to PlotPage for popup window
         SettingsPage.template_file = template_file  # For outputting sketch
-        
         SettingsPage.parent_notebook = parent_notebook
-
 
         self.buildPage()
         
@@ -100,6 +97,7 @@ class SettingsPage(ttk.Frame):
             textvariable = SettingsPage.num_of_seconds)
         self.seconds_entry.grid(padx=25, pady=15, row=1, column=1)
         
+        
         servo_total_label = ttk.Label(self, text='Number of servos (1-8)')
         servo_total_label.grid(padx=10, pady=15)
         
@@ -108,21 +106,24 @@ class SettingsPage(ttk.Frame):
             textvariable = SettingsPage.num_of_servos)
         self.servo_total_entry.grid(padx=25, pady=15, row=2, column=1)
         
+        
         self.generate_plots = ttk.Button(self, text='Generate Plots',
             command=self.generatePlots)
         self.generate_plots.grid(padx=25, pady=25, row=1, column=2,
             rowspan=2)
         
+        
         button_label = ttk.Label(self, text='Pin # of button')
         button_label.grid(padx=10, pady=15)
         
-        self.button_num = tk.IntVar()
-        self.button_num.set('')
+        SettingsPage.button_num = tk.IntVar()
+        SettingsPage.button_num.set('')
         button_entry = ttk.Entry(self, width=5, justify=tk.RIGHT,
-            textvariable=self.button_num)
+            textvariable=SettingsPage.button_num)
         button_entry.grid(padx=25, pady=15, row=3, column=1)
         
-        self.output_button = ttk.Button(self, text='Output Data', width=15,
+        
+        self.output_button = ttk.Button(self, text='Output Sketch', width=15,
             state='disabled', command=self.outputSketch)
         self.output_button.grid(padx=10, pady=50)
 
@@ -152,7 +153,7 @@ class SettingsPage(ttk.Frame):
             SettingsPage.num_of_servos.set(limit(temp_servos, 1, 8))
             
             if (SettingsPage.num_of_servos.get() * \
-                    SettingsPage.num_of_seconds.get()) > 360:
+                    SettingsPage.num_of_seconds.get()) >= 360:
                 self.resetEntries()
                 messagebox.showerror('Limit Error', 'Total routine length must \
                     be less than 6 minutes (360 seconds)')
@@ -262,11 +263,8 @@ class PlotPage(ttk.Frame):
         
         self.plot_num = PlotPage.total_pages
         self.parent = parent
-        self.name = name
+        self.name = name    # Child plot uses this for title
 
-        self.plot = None
-        self.pin_entry = None
-        
         self.buildPage()
     
     def buildPage(self):
@@ -278,8 +276,9 @@ class PlotPage(ttk.Frame):
             to=self.parent.num_of_seconds.get()-10,
             length=self.parent.parent_notebook.winfo_width())
         
-        # Plot class instance, bound to tab instance
-        self.plot = Plot(self, self.parent.num_of_seconds.get(), slider, self.plot_num)
+        # Plot instance, bound to tab instance
+        self.plot = Plot(self, self.parent.num_of_seconds.get(), slider,
+            self.plot_num)
         
         # Drawing area for the graph
         canvas = FigureCanvasTkAgg(self.plot.fig, master=self)
@@ -326,20 +325,20 @@ class Plot():
         self.scale['command'] = self.updatePos
         
         self.scale_pos = 0
-        self.num = num                      # Which number servo, for plot title
-        self.seconds = seconds              # Needed to limit scale for plot window
-        self.length = (self.seconds*2)+1    # Number of nodes in plot, 2 per second
+        self.num = num                 # Which number servo, for plot title
+        self.length = (seconds*2)+1    # Number of nodes in plot, 2 per second
         
-        self.click = False                  # Node follows mouse only when clicked
-        self.point_index = None             # Track which node has been selected
+        self.click = False             # Node follows mouse only when clicked
+        self.point_index = None        # Track which node has been selected
         
         # For keeping values within range of servo degrees
-        self.upper_limit = 180
-        self.lower_limit = 0
-        self.limit_range = lambda n: max(min(self.upper_limit, n), self.lower_limit)
+        upper_limit = 180
+        lower_limit = 0
+        self.limit_range = lambda n: max(min(upper_limit, n), lower_limit)
         
         # Initial Graph -----
         self.fig = Figure(figsize=(10,5), dpi=100)
+        self.fig.subplots_adjust(bottom=0.18)
         self.ax = self.fig.add_subplot(111)
         
         self.xs = [i for i in range(self.length)]
@@ -363,6 +362,9 @@ class Plot():
         self.ax.set_xlim([pos-.5, pos+x_window+.5])
         self.ax.set_xticks([i for i in range(pos, pos+x_window+1)])
         self.ax.set_xticklabels([i/2 for i in self.ax.get_xticks()])
+        if self.length > 201:
+            for tick in self.ax.get_xticklabels():
+                tick.set_rotation(45)
         
         self.ax.set_ylim([-10,190])
         self.ax.set_yticks(range(0,190,20))
@@ -430,12 +432,23 @@ def prettyOutput(arr):
 
 
 def saver():
+    '''Save relevent info to file for later use'''
+    
     info_dict = {
-                 'seconds' : SettingsPage.num_of_seconds,
-                 'plot_pages' : [['title', 'pin #', 'ys']]
+                 'seconds' : SettingsPage.num_of_seconds.get(),
+                 'plot_pages' : [],
+                 'button #' : SettingsPage.button_num.get()
                 }
 
-#~ for i in 
+    for page in SettingsPage.plot_pages:
+        temp = []
+        temp.append(page.name)
+        temp.append(page.pin_entry.get())
+        temp.append(page.plot.ys)
+    
+        info_dict['plot_pages'].append(temp)
+    print(info_dict)
+    
 
 
 
