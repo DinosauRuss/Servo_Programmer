@@ -73,6 +73,7 @@ class SettingsPage(ttk.Frame):
 
     plot_pages = []    # Used when outputting data
     millis = 15        # Delay between each inBetweener value
+    load_flag = False
     
     def __init__(self, parent_notebook, template_file):
         super().__init__()
@@ -210,15 +211,40 @@ class SettingsPage(ttk.Frame):
             print(e)
             messagebox.showerror(title='Error!', message='Inputs must be numbers')
             self.resetEntries()
-            
+        
+        
         else:
-            # Generate tabs/plots
-            for i in range(self.num_of_servos.get()):
-                tab_name = 'Servo{}'.format(i+1)
-                tab = 'self.{}_tab'.format(tab_name)
-                tab = PlotPage(self, tab_name)
-                SettingsPage.parent_notebook.add(tab, text=tab_name)
-                SettingsPage.plot_pages.append(tab)
+            if SettingsPage.load_flag:
+                # Use load file
+                
+                # Set appropriate values for entries
+                SettingsPage.button_num.set(SettingsPage.settings['button_#'])
+                SettingsPage.num_of_seconds.set(SettingsPage.settings['seconds'])
+                SettingsPage.num_of_servos.set(len(SettingsPage.settings['plot_pages']))
+                
+                # Generate tabs/plots using loaded data
+                temp_page_list = SettingsPage.settings['plot_pages']
+                for i in range(self.num_of_servos.get()):
+                    name = temp_page_list[i][0]
+                    tab = 'self.{}_tab'.format(name)
+                    tab = PlotPage(self, name)
+                    SettingsPage.parent_notebook.add(tab, text=name)
+                    SettingsPage.plot_pages.append(tab)
+                    
+                    for index, page in enumerate(SettingsPage.plot_pages):
+                        page.pin_num.set(temp_page_list[index][1])
+                        page.plot.ys = temp_page_list[index][2]
+                        page.plot.update()
+                        page.parent.parent_notebook.tab(index+1, text=page.name)
+            else:
+                # Generate tabs/plots from inputs
+                for i in range(self.num_of_servos.get()):
+                    tab_name = 'Servo{}'.format(i+1)
+                    tab = 'self.{}_tab'.format(tab_name)
+                    tab = PlotPage(self, tab_name)
+                    SettingsPage.parent_notebook.add(tab, text=tab_name)
+                    SettingsPage.plot_pages.append(tab)
+            
             
             self.generate_plots.configure(state='disabled')
             self.seconds_entry.configure(state='disabled')
@@ -344,23 +370,14 @@ class SettingsPage(ttk.Frame):
                 title='Load Settings')
             
         if file_name:
-            with open(file_name, 'rb') as reader:
-                settings = dill.load(reader)
+            cls.load_flag = True
             
-            # Apply loaded data to current app
-            cls.button_num.set(settings['button_#'])
-            cls.num_of_seconds.set(settings['seconds'])
-            cls.num_of_servos.set(len(settings['plot_pages']))
+            with open(file_name, 'rb') as reader:
+                cls.settings = dill.load(reader)
             
             cls.generatePlots(self)
             
-            temp_page_list = settings['plot_pages']
-            for index, page in enumerate(cls.plot_pages):
-                page.name = temp_page_list[index][0]
-                page.pin_num.set(temp_page_list[index][1])
-                page.plot.ys = temp_page_list[index][2]
-                page.plot.update()
-                page.parent.parent_notebook.tab(index+1, text=page.name)
+            del cls.settings
                 
     
 class PlotPage(ttk.Frame):
