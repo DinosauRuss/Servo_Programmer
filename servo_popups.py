@@ -55,6 +55,7 @@ class NamePopup(Popup):
         '''Make changes and close popup'''
         
         name = str(self.name_entry.get()).replace(' ', '')
+        name = name[:10]    # Limit length of name
         
         for tab in self.page.parent.plot_pages:
             if name == tab.name:
@@ -84,8 +85,9 @@ class AboutPopup(Popup):
         
         button_frame = ttk.Frame(main_frame)
         
-        help_button = ttk.Button(button_frame, text='Help')
-        ok_button = ttk.Button(button_frame, text='OK', command=self.close)
+        help_button = ttk.Button(button_frame, text='Help', width=10)
+        ok_button = ttk.Button(button_frame, text='OK', width=10,
+            command=self.close)
         
         main_frame.pack(fill=tk.BOTH, expand=1)
         help_button.pack(padx=5, side=tk.LEFT)

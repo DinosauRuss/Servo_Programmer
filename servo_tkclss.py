@@ -5,8 +5,9 @@ from matplotlib import use as Use
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
+import dill
 import os
-import time
+from time import sleep
 
 import tkinter as tk
 import tkinter.ttk as ttk
@@ -15,8 +16,6 @@ from tkinter import messagebox
 from tkinter.ttk import Notebook
 
 from servo_popups import *
-
-import dill
 
 
 # Needed to embed matplotlib in tkinter
@@ -45,7 +44,6 @@ class MainApp():
         menubar = tk.Menu(self.main)
         
         file_menu = tk.Menu(menubar, tearoff=0)
-        file_menu.add_command(label='Open', command=None)
         file_menu.add_command(label='Quit', command=self.main.destroy)
         
         about_menu = tk.Menu(self.main, tearoff=0)
@@ -86,6 +84,10 @@ class SettingsPage(ttk.Frame):
     def buildPage(self):
         '''Layout widgets for the tab'''
         
+        self.num_of_seconds = tk.IntVar()
+        self.num_of_servos = tk.IntVar()
+        self.button_num = tk.IntVar()
+        
         # --- Left side Frame ---
         left = ttk.Frame(self)
         left.pack(side=tk.LEFT, anchor=tk.N)
@@ -97,34 +99,28 @@ class SettingsPage(ttk.Frame):
             \n(1-360):')
         seconds_label.grid(padx=10, pady=15)
         
-        SettingsPage.num_of_seconds = tk.IntVar()
         self.seconds_entry = ttk.Entry(left, width=5, justify=tk.RIGHT,
-            textvariable = SettingsPage.num_of_seconds)
+            textvariable = self.num_of_seconds)
         self.seconds_entry.grid(padx=25, pady=15, row=1, column=1)
-        
         
         servo_total_label = ttk.Label(left, text='Number of servos (1-8)')
         servo_total_label.grid(padx=10, pady=15)
         
-        SettingsPage.num_of_servos = tk.IntVar()
         self.servo_total_entry = ttk.Entry(left, width=5, justify=tk.RIGHT,
-            textvariable = SettingsPage.num_of_servos)
+            textvariable = self.num_of_servos)
         self.servo_total_entry.grid(padx=25, pady=15, row=2, column=1)
         
-        
-        self.generate_plots = ttk.Button(left, text='Generate Plots',
+        self.generate_plots_button = ttk.Button(left, text='Generate Plots',
             command=self.generatePlots)
-        self.generate_plots.grid(padx=25, pady=25, row=1, column=2,
+        self.generate_plots_button.grid(padx=25, pady=25, row=1, column=2,
             rowspan=2)
         
         button_label = ttk.Label(left, text='Pin # of button')
         button_label.grid(padx=10, pady=15)
         
-        SettingsPage.button_num = tk.IntVar()
         button_entry = ttk.Entry(left, width=5, justify=tk.RIGHT,
-            textvariable=SettingsPage.button_num)
+            textvariable=self.button_num)
         button_entry.grid(padx=25, pady=15, row=3, column=1)
-        
         
         # --- Right side Frame ---
         right = ttk.Frame(self)
@@ -140,48 +136,19 @@ class SettingsPage(ttk.Frame):
         save_button = ttk.Button(right, text='Save', command=SettingsPage.saver)
         save_button.grid()
 
-        load_button = ttk.Button(
-            right,
-            text='Load',
+        self.load_button = ttk.Button(right, text='Load',
             command=lambda: SettingsPage.loader(self))
-        load_button.grid()
-
-
-
-        ### TESTING
-        btn = ttk.Button(
-            right,
-            text='print info',
-            command=SettingsPage.printStuff)
-        btn.grid()
-        #####
+        self.load_button.grid()
 
 
         self.resetEntries()
     
-    # TESTING
-    @classmethod
-    def printStuff(cls):
-        print()
-        print('Button num: {}'.format(cls.button_num.get()))
-        print('Length (sec) :', cls.num_of_seconds.get())
-        print('Pages:')
-        for page in cls.plot_pages:
-           print('Name: ', page.name)
-           print('Pin num: ', page.pin_num.get())
-           print('Y-value list: ', page.plot.ys)
-           print()
-           
-            
-    
-    
-    @classmethod
-    def resetEntries(cls):
+    def resetEntries(self):
         '''Clear the entry widgets'''
         
-        cls.num_of_seconds.set(1)
-        cls.num_of_servos.set(1)
-        cls.button_num.set(0)
+        self.num_of_seconds.set(1)
+        self.num_of_servos.set(1)
+        self.button_num.set(0)
         
     def generatePlots(self):
         '''
@@ -189,19 +156,19 @@ class SettingsPage(ttk.Frame):
         of the specified routine length
         '''
         
-        try:
+        try:    # Error checking inputs
             limit = lambda n, n_min, n_max: max(min(n, n_max), n_min)
             
             # Routine between 1 and 360 seconds
-            temp_secs= SettingsPage.num_of_seconds.get()
-            SettingsPage.num_of_seconds.set(limit(temp_secs, 1, 360))
+            temp_secs= self.num_of_seconds.get()
+            self.num_of_seconds.set(limit(temp_secs, 1, 360))
             
             # Maximum of 8 servos
-            temp_servos = SettingsPage.num_of_servos.get()
-            SettingsPage.num_of_servos.set(limit(temp_servos, 1, 8))
+            temp_servos = self.num_of_servos.get()
+            self.num_of_servos.set(limit(temp_servos, 1, 8))
             
-            if (SettingsPage.num_of_servos.get() * \
-                    SettingsPage.num_of_seconds.get()) >= 360:
+            if (self.num_of_servos.get() * \
+                    self.num_of_seconds.get()) >= 360:
                 self.resetEntries()
                 messagebox.showerror('Limit Error', 'Total routine length must \
                     be less than 6 minutes (360 seconds)')
@@ -212,15 +179,14 @@ class SettingsPage(ttk.Frame):
             messagebox.showerror(title='Error!', message='Inputs must be numbers')
             self.resetEntries()
         
-        
         else:
             if SettingsPage.load_flag:
-                # Use load file
+                # Use class attribute 'settings' from self.loader
                 
                 # Set appropriate values for entries
-                SettingsPage.button_num.set(SettingsPage.settings['button_#'])
-                SettingsPage.num_of_seconds.set(SettingsPage.settings['seconds'])
-                SettingsPage.num_of_servos.set(len(SettingsPage.settings['plot_pages']))
+                self.button_num.set(SettingsPage.settings['button_#'])
+                self.num_of_seconds.set(SettingsPage.settings['seconds'])
+                self.num_of_servos.set(len(SettingsPage.settings['plot_pages']))
                 
                 # Generate tabs/plots using loaded data
                 temp_page_list = SettingsPage.settings['plot_pages']
@@ -246,9 +212,11 @@ class SettingsPage(ttk.Frame):
                     SettingsPage.plot_pages.append(tab)
             
             
-            self.generate_plots.configure(state='disabled')
-            self.seconds_entry.configure(state='disabled')
-            self.servo_total_entry.configure(state='disabled')
+            self.generate_plots_button['state']='disabled'
+            self.seconds_entry['state']='disabled'
+            self.servo_total_entry['state']='disabled'
+            
+            self.load_button['state'] = 'disabled'
             self.output_button['state'] = 'normal'
     
     def outputSketch(self):
@@ -268,7 +236,7 @@ class SettingsPage(ttk.Frame):
         # Temporary data needed for template output
         name_arr = [tab.name for tab in SettingsPage.plot_pages]
         tweener_arrays = [
-            prettyOutput(self.inBetweeners(tab.plot.ys)) for tab in SettingsPage.plot_pages]
+            self.prettyOutput(self.inBetweeners(tab.plot.ys)) for tab in SettingsPage.plot_pages]
         pin_names = ['{}_PIN'.format(tab.name) for tab in SettingsPage.plot_pages]
         try:    # Each servo must have pin number assigned
             pin_nums = [int(tab.pin_num.get()) for tab in SettingsPage.plot_pages]
@@ -278,13 +246,6 @@ class SettingsPage(ttk.Frame):
             messagebox.showerror('Error', 'Check servo pin numbers')
             return
         
-        # Stuff for jinja2 template
-        template_loader = jinja2.FileSystemLoader(
-            searchpath=os.path.join(os.path.dirname(__file__)))
-        template_env = jinja2.Environment(loader=template_loader)
-        template_env.globals.update(zip=zip)
-        template_index = template_env.get_template(SettingsPage.template_file)
-        
         # Keys for template
         template_dict = {
             'list_of_names' : name_arr,
@@ -293,7 +254,14 @@ class SettingsPage(ttk.Frame):
             'button' : pin,
             'pinNames' : pin_names,
             'pinNums' : pin_nums}
-    
+        
+        # Stuff for jinja2 template
+        template_loader = jinja2.FileSystemLoader(
+            searchpath=os.path.join(os.path.dirname(__file__)))
+        template_env = jinja2.Environment(loader=template_loader)
+        template_env.globals.update(zip=zip)
+        template_index = template_env.get_template(SettingsPage.template_file)
+        
         file_name = fd.asksaveasfilename(
             initialdir=os.path.join(os.path.dirname(__file__)),
             defaultextension='.ino',
@@ -349,15 +317,12 @@ class SettingsPage(ttk.Frame):
                 title='Save Settings',
                 confirmoverwrite=True)
             
-            if file_name:   # Prevents error if cancel pressed
+            if file_name:   # Prevents error if dialog canceled
                 with open(file_name, 'wb') as writer:
                     dill.dump(info_dict, writer)
             
-            #~ for k, v in info_dict.items():
-                #~ print(k, ':', v)
-        
         except Exception as e:
-            print('some error')
+            print('Error saving...')
             print(e)
 
     @classmethod
@@ -379,6 +344,18 @@ class SettingsPage(ttk.Frame):
             
             del cls.settings
                 
+    @staticmethod
+    def prettyOutput(arr):
+        '''Outputs the plot values array in more human readable form'''
+    
+        tmp_str = ''
+        for index, num in enumerate(arr):
+            if (index+1) % 10 != 0:
+                tmp_str += '{}, '.format(num).rjust(5)
+            else:
+                tmp_str += '{},\n'.format(num).rjust(5)
+        return tmp_str 
+
     
 class PlotPage(ttk.Frame):
     '''Tab containing interactive plot'''
@@ -529,7 +506,7 @@ class Plot():
         
         else:
             # If node is double-clicked open popup to change value
-            time.sleep(.1)  # Needs short delay to end all events on mainloop
+            sleep(.1)  # Needs short delay to end all events on mainloop
             ValuePopup(self, self.point_index)
         
     def onMotion(self, event):
@@ -552,20 +529,6 @@ class Plot():
         self.drawPlot()
         self.fig.canvas.draw()        
         
-
-def prettyOutput(arr):
-    '''Outputs the plot values array in more human readable form'''
-    
-    tmp_str = ''
-    for index, num in enumerate(arr):
-        if (index+1) % 10 != 0:
-            tmp_str += '{}, '.format(num).rjust(5)
-        else:
-            tmp_str += '{},\n'.format(num).rjust(5)
-    return tmp_str 
-
-
-
     
 
 
