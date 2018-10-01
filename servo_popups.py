@@ -6,14 +6,15 @@ from tkinter import ttk
 class Popup():
     '''Generic top level pop-up window'''
 
-    def __init__(self, title='This is a Title', geometry='200x100'):
+    def __init__(self, title='This is a Title', geometry=None):
         # Create new top-level window
         self.dialog=tk.Toplevel()
         self.dialog.title(title)
-        self.dialog.geometry(geometry)
+        if geometry:
+            self.dialog.geometry(geometry)
         self.dialog.resizable(False, False)
         
-        self.buildPage()
+        #~ self.buildPage()
         
         # Freezes main window until popup is closed
         self.dialog.transient()
@@ -33,6 +34,7 @@ class NamePopup(Popup):
         super().__init__(title, geometry)
         
         self.page = page
+        self.buildPage()
         
     def buildPage(self):    
         self.name_entry = ttk.Entry(self.dialog)
@@ -77,6 +79,8 @@ class AboutPopup(Popup):
     def __init__(self, title='About', geometry='200x100'):
         super().__init__(title, geometry)
         
+        self.buildPage()
+        
     def buildPage(self):
         main_frame = ttk.Frame(self.dialog)
         
@@ -107,6 +111,8 @@ class ValuePopup(Popup):
         self.plot = plot
         self.index = node_index
         
+        self.buildPage()
+        
     def buildPage(self):
         main_frame = ttk.Frame(self.dialog, padding=5)
         
@@ -136,4 +142,64 @@ class ValuePopup(Popup):
             self.dialog.destroy()
 
 
+class LimitPopup(Popup):
+    '''Change value of individual node'''
+    
+    def __init__(self, plot, title='Change Limits'):
+        super().__init__(title)
+        
+        self.plot = plot
+        self.upper = self.plot.upper_limit
+        self.lower = self.plot.lower_limit
+        
+        self.buildPage()
+        
+        
+    def buildPage(self):
+        main_frame = ttk.Frame(self.dialog, padding=5)
+        
+        title = ttk.Label(main_frame, text='Enter new values', font=(None, 12))
+        
+        upper_label = ttk.Label(main_frame, text='Upper:')
+        self.upper_entry = ttk.Entry(main_frame, width=6)
+        self.upper_entry.insert(0, self.upper)
+        self.upper_entry.focus()
+        
+        lower_label = ttk.Label(main_frame, text='Lower:')
+        self.lower_entry = ttk.Entry(main_frame, width=6)
+        self.lower_entry.insert(0, self.lower)
+     
+        button = ttk.Button(main_frame, text='OK', command=self.update)
+    
+        main_frame.pack(fill=tk.BOTH, expand=1)
+        
+        title.grid(columnspan=2, padx=5, pady=5)
+        
+        upper_label.grid(row=1, column=0, sticky=tk.W)
+        lower_label.grid(row=1, column=1, sticky=tk.E)
+        
+        self.upper_entry.grid(row=2, column=0,pady=5, sticky=tk.W)
+        self.lower_entry.grid(row=2, column=1, sticky=tk.E)
+        button.grid(columnspan=2, pady=5)
+            
+    def update(self, event=None):
+        limit = lambda n, n_min, n_max: max(min(n, n_max), n_min)
+        
+        try:
+            self.plot.upper_limit = int(self.upper_entry.get())
+            self.plot.upper_limit = limit(
+                self.plot.upper_limit, 5, 180)
+            
+            self.plot.lower_limit = int(self.lower_entry.get())
+            self.plot.lower_limit = limit(
+                self.plot.lower_limit, 0, self.plot.upper_limit-5)
+            
+            
+            self.plot.update()
+            
+        except Exception as e:
+            print('VAL ERROR: ', e)
+        
+        finally:
+            self.dialog.destroy()
 

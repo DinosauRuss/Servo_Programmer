@@ -133,11 +133,12 @@ class SettingsPage(ttk.Frame):
             state='disabled', command=self.outputSketch)
         self.output_button.grid(padx=10, pady=50)
         
-        save_button = ttk.Button(right, text='Save', command=SettingsPage.saver)
-        save_button.grid()
+        self.save_button = ttk.Button(right, text='Save', state='disabled',
+            command=self.saver)
+        self.save_button.grid()
 
         self.load_button = ttk.Button(right, text='Load',
-            command=lambda: SettingsPage.loader(self))
+            command=self.loader)
         self.load_button.grid()
 
 
@@ -180,16 +181,16 @@ class SettingsPage(ttk.Frame):
             self.resetEntries()
         
         else:
-            if SettingsPage.load_flag:
-                # Use class attribute 'settings' from self.loader
+            if self.load_flag:
+                # Use attribute 'settings' from self.loader
                 
                 # Set appropriate values for entries
-                self.button_num.set(SettingsPage.settings['button_#'])
-                self.num_of_seconds.set(SettingsPage.settings['seconds'])
-                self.num_of_servos.set(len(SettingsPage.settings['plot_pages']))
+                self.button_num.set(self.settings['button_#'])
+                self.num_of_seconds.set(self.settings['seconds'])
+                self.num_of_servos.set(len(self.settings['plot_pages']))
                 
                 # Generate tabs/plots using loaded data
-                temp_page_list = SettingsPage.settings['plot_pages']
+                temp_page_list = self.settings['plot_pages']
                 for i in range(self.num_of_servos.get()):
                     name = temp_page_list[i][0]
                     tab = 'self.{}_tab'.format(name)
@@ -216,6 +217,7 @@ class SettingsPage(ttk.Frame):
             self.seconds_entry['state']='disabled'
             self.servo_total_entry['state']='disabled'
             
+            self.save_button['state'] = 'normal'
             self.load_button['state'] = 'disabled'
             self.output_button['state'] = 'normal'
     
@@ -292,18 +294,17 @@ class SettingsPage(ttk.Frame):
         
         return temp_arr
     
-    @classmethod
-    def saver(cls):
+    def saver(self):
         '''Save relevent info to file for later use'''
     
         try:
             info_dict = {
-                         'seconds' : cls.num_of_seconds.get(),
+                         'seconds' : self.num_of_seconds.get(),
                          'plot_pages' : [],
-                         'button_#' : cls.button_num.get()
+                         'button_#' : self.button_num.get()
                         }
         
-            for page in cls.plot_pages:
+            for page in self.plot_pages:
                 temp = []
                 temp.append(page.name)
                 temp.append(page.pin_num.get())
@@ -325,8 +326,8 @@ class SettingsPage(ttk.Frame):
             print('Error saving...')
             print(e)
 
-    @classmethod
-    def loader(cls, self):
+    #~ @classmethod
+    def loader(self):
         '''Loads data from previous save'''
         
         file_name = fd.askopenfilename(
@@ -335,14 +336,14 @@ class SettingsPage(ttk.Frame):
                 title='Load Settings')
             
         if file_name:
-            cls.load_flag = True
+            self.load_flag = True
             
             with open(file_name, 'rb') as reader:
-                cls.settings = dill.load(reader)
+                self.settings = dill.load(reader)
             
-            cls.generatePlots(self)
+            self.generatePlots()
             
-            del cls.settings
+            del self.settings
                 
     @staticmethod
     def prettyOutput(arr):
@@ -377,7 +378,7 @@ class PlotPage(ttk.Frame):
         '''Layout widgets for the tab'''
         
         # To scroll along the plot
-        # Upper limit is seconds - half the length of the viewport of the plot
+        # Upper limit is seconds minus half the length of the plot 'x_window'
         slider = ttk.Scale(self, orient=tk.HORIZONTAL,
             to=self.parent.num_of_seconds.get()-10,
             length=self.parent.parent_notebook.winfo_width())
@@ -401,9 +402,12 @@ class PlotPage(ttk.Frame):
             width=5,
             justify=tk.RIGHT,
             textvariable=self.pin_num)
-        
-        self.rename_button = ttk.Button(self, text='Change servo name',
+       
+        button_frame = ttk.Frame(self, padding=10) 
+        self.rename_button = ttk.Button(button_frame, text='Change servo name',
             command=self.changeName)
+        self.change_limits_button = ttk.Button(button_frame, text='Change limits',
+            command = self.changeLimits)
         
         # Grid widgets into tab
         canvas.get_tk_widget().grid(columnspan=3)
@@ -412,18 +416,22 @@ class PlotPage(ttk.Frame):
         pin_assign_frame.grid(sticky=tk.W)
         pin_label.grid()
         self.pin_entry.grid(row=0, column=1)
-        self.rename_button.grid(row=2, column=2, padx=10, pady=10, sticky=tk.E)
+        
+        button_frame.grid(row=2, column=2, sticky=tk.E)
+        self.change_limits_button.grid(padx=5)
+        self.rename_button.grid(row=0, column=1)
 
     def changeName(self):
         '''Change plot title name and tab text'''
         
-        self.rename_button['state'] = 'disabled'
-        
         NamePopup(self)
         
-        self.rename_button['state'] = 'normal'
-  
-  
+    def changeLimits(self):
+        '''Change upper and lower bounds of the plot'''
+        
+        LimitPopup(self.plot)
+        
+
 class Plot():
     '''
     A container for holding variables and methods needed for 
@@ -443,9 +451,9 @@ class Plot():
         self.point_index = None        # Track which node has been selected
         
         # For keeping values within range of servo degrees
-        upper_limit = 180
-        lower_limit = 0
-        self.limit_range = lambda n: max(min(upper_limit, n), lower_limit)
+        self.upper_limit = 180
+        self.lower_limit = 0
+        self.limit_range = lambda n: max(min(self.upper_limit, n), self.lower_limit)
         
         # Initial Graph -----
         self.fig = Figure(figsize=(10,5), dpi=100)
@@ -453,7 +461,7 @@ class Plot():
         self.ax = self.fig.add_subplot(111)
         
         self.xs = [i for i in range(self.length)]
-        self.ys = [0 for i in self.xs]
+        self.ys = [self.lower_limit for i in self.xs]
         
         self.drawPlot()
        
@@ -468,6 +476,9 @@ class Plot():
         x_window = 20                   # Num of ticks in 'viewport'
         pos = round(self.scale_pos*2)   # scale_pos is in seconds, pos is in ticks
         pos = max(pos, 0)               
+        
+        # Confine y-values to within upper and lower limits
+        self.ys = [self.limit_range(node) for node in self.ys]
         
         # Only 'x_window' of plot is viewable
         self.ax.set_xlim([pos-.5, pos+x_window+.5])
@@ -485,14 +496,20 @@ class Plot():
         self.ax.set_xlabel('Seconds')
         self.ax.set_ylabel('Degree of Motion', fontname='BPG Courier GPL&GNU', fontsize=18)
         
-        # Plot line
-        self.line, = self.ax.plot(self.xs, self.ys, color='orange',
+        # Plot upper and lower limits
+        upper = self.ax.plot(self.xs, [self.upper_limit for i in range(self.length)],
+            'k--', alpha=.6, linewidth=1)
+        lower = self.ax.plot(self.xs, [self.lower_limit for i in range(self.length)],
+            'k--', alpha=.6, linewidth=1)
+        
+        # Line
+        line = self.ax.plot(self.xs, self.ys, color='orange',
             markersize=10)
             
-        # Plot clickable nodes
-        self.line2, = self.ax.plot(self.xs, self.ys, 'k.', 
+        # Clickable nodes
+        nodes = self.ax.plot(self.xs, self.ys, 'k.', 
             markersize=10, picker=5.0)
-        
+            
     def onPress(self, event):
         '''Which node has been clicked'''
         
