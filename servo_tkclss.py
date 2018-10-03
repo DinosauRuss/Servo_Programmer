@@ -86,7 +86,8 @@ class SettingsPage(ttk.Frame):
         
         self.num_of_seconds = tk.IntVar()
         self.num_of_servos = tk.IntVar()
-        self.button_num = tk.IntVar()
+        self.button_entry_val = tk.StringVar()
+        self.btn_check_var = tk.IntVar()
         
         # --- Left side Frame ---
         left = ttk.Frame(self)
@@ -115,12 +116,16 @@ class SettingsPage(ttk.Frame):
         self.generate_plots_button.grid(padx=25, pady=25, row=1, column=2,
             rowspan=2)
         
-        button_label = ttk.Label(left, text='Pin # of button')
-        button_label.grid(padx=10, pady=15)
-        
-        button_entry = ttk.Entry(left, width=5, justify=tk.RIGHT,
-            textvariable=self.button_num)
-        button_entry.grid(padx=25, pady=15, row=3, column=1)
+        self.btn_check_var.set(False)
+        button_checkbox = ttk.Checkbutton(left,
+            text = 'Use button to Start Routine\n(Enter Button Number)',
+            variable=self.btn_check_var,
+            command=self.toggle_btn_checkbox)
+        button_checkbox.grid()
+    
+        self.button_entry = ttk.Entry(left, width=5, justify=tk.RIGHT,
+            textvariable=self.button_entry_val, state='disabled')
+        self.button_entry.grid(padx=25, pady=15, row=3, column=1)
         
         # --- Right side Frame ---
         right = ttk.Frame(self)
@@ -134,22 +139,31 @@ class SettingsPage(ttk.Frame):
         self.output_button.grid(padx=10, pady=50)
         
         self.save_button = ttk.Button(right, text='Save', state='disabled',
-            command=self.saver)
+            command=self.saveData)
         self.save_button.grid()
 
         self.load_button = ttk.Button(right, text='Load',
-            command=self.loader)
+            command=self.loadData)
         self.load_button.grid()
 
 
         self.resetEntries()
+    
+    def toggle_btn_checkbox(self):
+        '''Toggle state of button entry based on checkbox'''
+        
+        if self.btn_check_var.get():
+            self.button_entry.configure(state='normal')
+        else:
+            self.button_entry.configure(state='disabled')
+            self.button_entry_val.set('None')
     
     def resetEntries(self):
         '''Clear the entry widgets'''
         
         self.num_of_seconds.set(1)
         self.num_of_servos.set(1)
-        self.button_num.set(0)
+        self.button_entry_val.set('None')
         
     def generatePlots(self):
         '''
@@ -182,10 +196,15 @@ class SettingsPage(ttk.Frame):
         
         else:
             if self.load_flag:
-                # Use attribute 'settings' from self.loader
+                # Use attribute 'settings' from self.loadData
                 
                 # Set appropriate values for entries
-                self.button_num.set(self.settings['button_#'])
+                if self.settings['button_#'] == 'None':
+                    self.btn_check_var.set(False)
+                else:
+                    self.btn_check_var.set(True)
+                    self.button_entry_val.set(self.settings['button_#'])
+                self.toggle_btn_checkbox()
                 self.num_of_seconds.set(self.settings['seconds'])
                 self.num_of_servos.set(len(self.settings['plot_pages']))
                 
@@ -229,10 +248,22 @@ class SettingsPage(ttk.Frame):
 
          # Verify all pin #s before doing anything else
         try:
-            pin = self.button_num.get()
-        except Exception:
+            if self.btn_check_var.get():
+                pin = int(self.button_entry_val.get())
+            else:
+                pin = self.button_entry_val.get()
+        except Exception as e:
+            print(e)
             messagebox.showerror('Error!', 'Bad button pin #')
-            self.button_num.set('')
+            self.button_entry_val.set('None')
+            return
+        try:    # Each servo must have unique pin number assigned
+            pin_nums = [int(tab.pin_num.get()) for tab in SettingsPage.plot_pages]
+            if len(pin_nums) != len(set(pin_nums)):
+                messagebox.showerror('Error', 'Repeated servo pin numbers')
+                return
+        except Exception:
+            messagebox.showerror('Error', 'Check servo pin numbers')
             return
         
         # Temporary data needed for template output
@@ -240,13 +271,6 @@ class SettingsPage(ttk.Frame):
         tweener_arrays = [
             self.prettyOutput(self.inBetweeners(tab.plot.ys)) for tab in SettingsPage.plot_pages]
         pin_names = ['{}_PIN'.format(tab.name) for tab in SettingsPage.plot_pages]
-        try:    # Each servo must have pin number assigned
-            pin_nums = [int(tab.pin_num.get()) for tab in SettingsPage.plot_pages]
-            if len(pin_nums) != len(set(pin_nums)):
-                raise ValueError
-        except ValueError:
-            messagebox.showerror('Error', 'Check servo pin numbers')
-            return
         
         # Keys for template
         template_dict = {
@@ -294,14 +318,14 @@ class SettingsPage(ttk.Frame):
         
         return temp_arr
     
-    def saver(self):
+    def saveData(self):
         '''Save relevent info to file for later use'''
     
         try:
             info_dict = {
                          'seconds' : self.num_of_seconds.get(),
                          'plot_pages' : [],
-                         'button_#' : self.button_num.get()
+                         'button_#' : self.button_entry_val.get()
                         }
         
             for page in self.plot_pages:
@@ -327,7 +351,7 @@ class SettingsPage(ttk.Frame):
             print(e)
 
     #~ @classmethod
-    def loader(self):
+    def loadData(self):
         '''Loads data from previous save'''
         
         file_name = fd.askopenfilename(
@@ -377,6 +401,8 @@ class PlotPage(ttk.Frame):
     def buildPage(self):
         '''Layout widgets for the tab'''
         
+        self.pin_num = tk.IntVar()
+        
         # To scroll along the plot
         # Upper limit is seconds minus half the length of the plot 'x_window'
         slider = ttk.Scale(self, orient=tk.HORIZONTAL,
@@ -396,7 +422,7 @@ class PlotPage(ttk.Frame):
         
         pin_assign_frame = ttk.Frame(self, padding=10)
         pin_label = ttk.Label(pin_assign_frame, text='Pin # or address: ')
-        self.pin_num = tk.IntVar()
+        #~ self.pin_num = tk.IntVar()
         self.pin_entry = ttk.Entry(
             pin_assign_frame,
             width=5,

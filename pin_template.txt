@@ -130,7 +130,7 @@ void setup()
 } 
  
  
-void loop() 
+void loop() {% if button != 'None' %}
 {
   // Button press starts servo routine
   if ((digitalRead(BUTTON_PIN) == LOW))
@@ -139,5 +139,7 @@ void loop()
     routine(SERVO_ARR, NUM_SERVOS, VALUES_ARRAY, INTERVAL, ARRAY_LENGTH);
     Serial.println(F("Exiting routine"));
   }
- 
-}
+{% else %}
+  // Do something with routine function:
+    // routine(SERVO_ARR, NUM_SERVOS, VALUES_ARRAY, INTERVAL, ARRAY_LENGTH);
+} {% endif %}

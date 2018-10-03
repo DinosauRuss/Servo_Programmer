@@ -4,3 +4,5 @@ sketch*
 *.servo
 *.ino
 virtualEnv
+ignore_folder
+
