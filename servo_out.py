@@ -23,9 +23,9 @@ Use('TkAgg')
 
 
 class MainApp():
-    def __init__(self, template_file, width=800, height=600):
+    def __init__(self, width=800, height=600):
         
-        self.template_file = template_file
+        #~ self.template_file = template_file
         
         self.main = tk.Tk()
         self.main.title('Servo Programmer')
@@ -60,7 +60,7 @@ class MainApp():
             height=self.main.winfo_height())
         
         # Initial tab -----
-        settings_tab = SettingsPage(notebook, self.template_file)
+        settings_tab = SettingsPage(notebook)
         notebook.add(settings_tab, text='Settings')
         
         notebook.pack(anchor=tk.CENTER, fill=tk.BOTH)
@@ -73,11 +73,11 @@ class SettingsPage(ttk.Frame):
     millis = 15        # Delay between each inBetweener value
     load_flag = False
     
-    def __init__(self, parent_notebook, template_file):
+    def __init__(self, parent_notebook):
         super().__init__()
         
-        SettingsPage.template_file = template_file  # For outputting sketch
-        SettingsPage.parent_notebook = parent_notebook
+        #~ self.template_file = template_file  # For outputting sketch
+        self.parent_notebook = parent_notebook
 
         self.buildPage()
         
@@ -88,6 +88,7 @@ class SettingsPage(ttk.Frame):
         self.num_of_servos = tk.IntVar()
         self.button_entry_val = tk.StringVar()
         self.btn_check_var = tk.IntVar()
+        self.output_type_var = tk.StringVar()   # Pin nums or i2c
         
         # --- Left side Frame ---
         left = ttk.Frame(self)
@@ -116,17 +117,6 @@ class SettingsPage(ttk.Frame):
         self.generate_plots_button.grid(padx=25, pady=25, row=1, column=2,
             rowspan=2)
         
-        self.btn_check_var.set(False)
-        button_checkbox = ttk.Checkbutton(left,
-            text = 'Use button to Start Routine\n(Enter Button Number)',
-            variable=self.btn_check_var,
-            command=self.toggle_btn_checkbox)
-        button_checkbox.grid()
-    
-        self.button_entry = ttk.Entry(left, width=5, justify=tk.RIGHT,
-            textvariable=self.button_entry_val, state='disabled')
-        self.button_entry.grid(padx=25, pady=15, row=3, column=1)
-        
         # --- Right side Frame ---
         right = ttk.Frame(self)
         right.pack(anchor=tk.CENTER)
@@ -134,17 +124,40 @@ class SettingsPage(ttk.Frame):
         r_title = ttk.Label(right, text='Output', font=(None, 25))
         r_title.grid(columnspan=5, pady=20)
         
+        
+        self.btn_check_var.set(False)
+        button_checkbox = ttk.Checkbutton(right,
+            text = 'Use button to Start Routine\n(Enter Button Number)',
+            variable=self.btn_check_var,
+            command=self.toggle_btn_checkbox)
+        button_checkbox.grid()
+    
+        self.button_entry = ttk.Entry(right, width=5, justify=tk.RIGHT,
+            textvariable=self.button_entry_val, state='disabled')
+        self.button_entry.grid(padx=25, pady=5, row=1, column=1)
+        
+        output_choice = ttk.LabelFrame(right, text='Servo Control Method')
+        output_choice.grid(pady=15, sticky=tk.W)
+        
+        self.i2c = ttk.Radiobutton(output_choice, text='i2c PCA9865',
+            variable=self.output_type_var, value='i2c')
+        self.i2c.pack(side=tk.LEFT, padx=5)
+        self.i2c.invoke()   # Sets as efault selection
+        self.pins = ttk.Radiobutton(output_choice, text='Arduino Pins',
+            variable=self.output_type_var, value='pins')
+        self.pins.pack(side=tk.RIGHT, padx=5)
+    
         self.output_button = ttk.Button(right, text='Output Sketch', width=15,
             state='disabled', command=self.outputSketch)
-        self.output_button.grid(padx=10, pady=50)
+        self.output_button.grid(pady=50, columnspan=2)
         
         self.save_button = ttk.Button(right, text='Save', state='disabled',
             command=self.saveData)
-        self.save_button.grid()
+        self.save_button.grid(sticky=tk.W)
 
         self.load_button = ttk.Button(right, text='Load',
             command=self.loadData)
-        self.load_button.grid()
+        self.load_button.grid(row=4, column=1)
 
 
         self.resetEntries()
@@ -204,6 +217,10 @@ class SettingsPage(ttk.Frame):
                 else:
                     self.btn_check_var.set(True)
                     self.button_entry_val.set(self.settings['button_#'])
+                if self.settings['output_type'] == 'i2c':
+                    self.i2c.invoke()
+                else:
+                    self.pins.invoke()
                 self.toggle_btn_checkbox()
                 self.num_of_seconds.set(self.settings['seconds'])
                 self.num_of_servos.set(len(self.settings['plot_pages']))
@@ -214,7 +231,7 @@ class SettingsPage(ttk.Frame):
                     name = temp_page_list[i][0]
                     tab = 'self.{}_tab'.format(name)
                     tab = PlotPage(self, name)
-                    SettingsPage.parent_notebook.add(tab, text=name)
+                    self.parent_notebook.add(tab, text=name)
                     SettingsPage.plot_pages.append(tab)
                     
                     for index, page in enumerate(SettingsPage.plot_pages):
@@ -228,7 +245,7 @@ class SettingsPage(ttk.Frame):
                     tab_name = 'Servo{}'.format(i+1)
                     tab = 'self.{}_tab'.format(tab_name)
                     tab = PlotPage(self, tab_name)
-                    SettingsPage.parent_notebook.add(tab, text=tab_name)
+                    self.parent_notebook.add(tab, text=tab_name)
                     SettingsPage.plot_pages.append(tab)
             
             
@@ -279,14 +296,20 @@ class SettingsPage(ttk.Frame):
             'tweenerArrays': tweener_arrays,
             'button' : pin,
             'pinNames' : pin_names,
-            'pinNums' : pin_nums}
+            'pinNums' : pin_nums,
+            'outputType' : self.output_type_var.get()}
         
         # Stuff for jinja2 template
         template_loader = jinja2.FileSystemLoader(
             searchpath=os.path.join(os.path.dirname(__file__)))
         template_env = jinja2.Environment(loader=template_loader)
         template_env.globals.update(zip=zip)
-        template_index = template_env.get_template(SettingsPage.template_file)
+        if self.output_type_var.get() == 'i2c':
+            template_index = template_env.get_template('i2c_template.txt')
+        elif self.output_type_var.get() == 'pins':
+            template_index = template_env.get_template('pin_template.txt')
+        else:
+            raise Exception
         
         file_name = fd.asksaveasfilename(
             initialdir=os.path.join(os.path.dirname(__file__)),
@@ -325,7 +348,8 @@ class SettingsPage(ttk.Frame):
             info_dict = {
                          'seconds' : self.num_of_seconds.get(),
                          'plot_pages' : [],
-                         'button_#' : self.button_entry_val.get()
+                         'button_#' : self.button_entry_val.get(),
+                         'output_type': self.output_type_var.get()
                         }
         
             for page in self.plot_pages:
@@ -350,7 +374,6 @@ class SettingsPage(ttk.Frame):
             print('Error saving...')
             print(e)
 
-    #~ @classmethod
     def loadData(self):
         '''Loads data from previous save'''
         
@@ -477,7 +500,7 @@ class Plot():
         self.point_index = None        # Track which node has been selected
         
         # For keeping values within range of servo degrees
-        self.upper_limit = 180
+        self.upper_limit = 179
         self.lower_limit = 0
         self.limit_range = lambda n: max(min(self.upper_limit, n), self.lower_limit)
         
@@ -578,11 +601,12 @@ class Plot():
 
 WIDTH = 1000
 HEIGHT = 600
-TEMPLATE_FILE = 'pin_template.txt'
+#~ TEMPLATE_FILE = 'pin_template.txt'
+TEMPLATE_FILE = 'combo_template.txt'
 
 if __name__ == '__main__':
     
-    app = MainApp(TEMPLATE_FILE, WIDTH, HEIGHT)
+    app = MainApp(WIDTH, HEIGHT)
     app.main.mainloop()
     
     

@@ -1,39 +1,32 @@
 
-#include <Servo.h> 
+#include <Wire.h>
+#include <Adafruit_PWMServoDriver.h>
+
+Adafruit_PWMServoDriver servo_driver = Adafruit_PWMServoDriver();
 
 
-//-------------------------------------//
-// Measure available SRAM
-
-int freeRam () {
-  extern int __heap_start, *__brkval; 
-  int v; 
-  return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval); 
-}
-//------------------------------------//
-
-
-// Declare each servo object
-{% for tabName in list_of_names %}Servo {{tabName}};
+// Declare each servo
+{% for tabName in list_of_names %}int {{tabName}};
 {% endfor %}
-// Array of servo objects, useful to iterate over
-Servo SERVO_ARR[] = { {% for tabName in list_of_names %}{{tabName}}, {% endfor %}};
+// Array of servos, useful to iterate over
+int SERVO_ARR[] = { {% for tabName in list_of_names %}{{tabName}}, {% endfor %}};
 
 // Calculate number of servos
-byte NUM_SERVOS = sizeof(SERVO_ARR) / sizeof(Servo);
+byte NUM_SERVOS = sizeof(SERVO_ARR) / sizeof(int);
 
 // Time 'delay' between each servo position update
 const unsigned long INTERVAL = {{interval}};
 
 
 // Initialize servo position (value) arrays for each servo
+// These are the recorded routines
 {% for tabName, array in zip(list_of_names,tweenerArrays) %}
 const byte {{tabName}}_arr[]PROGMEM = 
 {
 {{array}}
 };
 {% endfor %}
-// Calculate length of each value array
+// Calculate length of value array (how long the routine is)
 const unsigned int ARRAY_LENGTH = sizeof({{list_of_names[0]}}_arr) / sizeof(byte);
 
 // Array of position(value) arrays, useful to iterate over 
@@ -44,7 +37,12 @@ const byte* VALUES_ARRAY[] = { {% for tabName in list_of_names %}{{tabName}}_arr
 const byte BUTTON_PIN = {{button}};
 {% endif %}
 
-void routine(Servo arr_of_servos[], byte num_of_servos, const byte* arr_of_valueArrays[], byte interval, unsigned int length)
+//================================
+const int SERVOMIN = 150;
+const int SERVOMAX = 585;
+
+//================================
+void routine(int arr_of_servos[], byte num_of_servos, const byte* arr_of_valueArrays[], byte interval, unsigned int length)
 {
   /*
     Updates positions of all servos concurrently for entirety of the
@@ -66,10 +64,12 @@ void routine(Servo arr_of_servos[], byte num_of_servos, const byte* arr_of_value
     
     if (elapsed_time > compare_to)
     {
-      for (int i=0; i<num_of_servos; i++)
+      for (byte i=0; i<num_of_servos; i++)
       {
         byte temp_byte = pgm_read_byte(&arr_of_valueArrays[i][pos]);
-        arr_of_servos[i].write(temp_byte);   
+        int value = map(temp_byte, 0, 179, SERVOMIN, SERVOMAX);
+        
+        servo_driver.setPin(i, value);
       }
       pos++;
     }
@@ -81,16 +81,18 @@ void routine(Servo arr_of_servos[], byte num_of_servos, const byte* arr_of_value
     }
   }
 
-  // Add 1s delay at end of routine
+  // Add delay at end of routine
   unsigned long start_delay = millis();
-  while ((millis() - start_delay) < 1000)
+  while ((millis() - start_delay) < 3000)
   {
   }
 
   // Reset servos to initial position
   for (byte i=0; i<num_of_servos; i++)
   {
-    arr_of_servos[i].write(VALUES_ARRAY[i][0]);
+    byte temp_byte = pgm_read_byte(&arr_of_valueArrays[i][0]);
+    int value = map(temp_byte, 0, 179, SERVOMIN, SERVOMAX);
+    servo_driver.setPin(i, value);
   }
 
   Serial.println(F("Routine has ended"));
@@ -100,38 +102,38 @@ void routine(Servo arr_of_servos[], byte num_of_servos, const byte* arr_of_value
 
 }
 
+//================================
 
-void setup() 
-{   
-  // Assign pin # to each servo and create array
-{% for pin, num in zip(pinNames, pinNums) %}  const byte {{pin}} = {{num}};
-{% endfor %}
-  const byte SERVO_PINS[] = { {% for pin in pinNames %}{{pin}}, {% endfor %}};
+void setup() {
 
   Serial.begin(9600);
-  Serial.println(F("Hello from the Microcontroller"));
+  Serial.println(F("Hello from the Microcontroller i2c template"));
   Serial.print("array length: ");
   Serial.println(ARRAY_LENGTH);
-  
+
 {% if button != 'None' %}
   pinMode(BUTTON_PIN, INPUT_PULLUP); {% endif %}
 
+  servo_driver.begin();
+  servo_driver.setPWMFreq(50);
+
   for (byte i=0; i<NUM_SERVOS; i++)
-  // Attach all servos and set to starting position
+  // Set all servos to starting position
   {
-    SERVO_ARR[i].attach(SERVO_PINS[i], 600, 2500);
-    SERVO_ARR[i].write(VALUES_ARRAY[i][0]);
+    byte temp_byte = pgm_read_byte(&VALUES_ARRAY[i][0]);
+    int value = map(temp_byte, 0, 179, SERVOMIN, SERVOMAX);
+    servo_driver.setPin(i, value);
   }
-  
-  // Add 2s delay before loop starts
-  unsigned long start_delay = millis();
-  while ((millis() - start_delay) < 2000)
+
+  long now = millis();  // Add delay before loop starts
+  while ((millis() - now) < 2000)
   {
   }
-  Serial.println(F("Goodbye"));
-} 
- 
- 
+
+  Serial.println(F("Now entering main loop..."));
+}
+
+
 void loop() {% if button != 'None' %}
 {
   // Button press starts servo routine
@@ -146,3 +148,5 @@ void loop() {% if button != 'None' %}
     // routine(SERVO_ARR, NUM_SERVOS, VALUES_ARRAY, INTERVAL, ARRAY_LENGTH);
 {% endif %}
 }
+
+
