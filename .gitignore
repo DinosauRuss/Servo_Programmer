@@ -1,8 +1,0 @@
-.gitignore
-__pycache__
-sketch*
-*.servo
-*.ino
-virtualEnv
-ignore_folder
-
