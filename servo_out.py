@@ -39,6 +39,8 @@ class MainApp():
         
         self.buildPage()
         
+        self.main.mainloop()
+        
     def buildPage(self):
         # ----- Meubar configuration -----
         menubar = tk.Menu(self.main)
@@ -196,7 +198,7 @@ class SettingsPage(ttk.Frame):
             self.num_of_servos.set(limit(temp_servos, 1, 8))
             
             if (self.num_of_servos.get() * \
-                    self.num_of_seconds.get()) >= 360:
+                    self.num_of_seconds.get()) > 360:
                 self.resetEntries()
                 messagebox.showerror('Limit Error', 'Total routine length must \
                     be less than 6 minutes (360 seconds)')
@@ -512,15 +514,37 @@ class Plot():
         self.xs = [i for i in range(self.length)]
         self.ys = [self.lower_limit for i in self.xs]
         
+        self.setPlot()
         self.drawPlot()
        
     def updatePos(self, *args):
         '''Read the scale to move plot viewing area'''
         self.scale_pos = self.scale.get()
         self.update()
+    
+    def setPlot(self):
+        '''Elements of the plot which do not need to be redrawn every update '''
+        
+        self.ax.set_ylim([-10,190])
+        self.ax.set_yticks(range(0,190,20))
+        
+        self.ax.grid(alpha=.5)
+        self.ax.set_xlabel('Seconds')
+        self.ax.set_ylabel('Degree of Motion', fontname='BPG Courier GPL&GNU',
+            fontsize=14)
+        
+    def clearPlotLines(self):
+        '''Remove plotted lines so they can be redrawn'''
+        
+        self.line.remove()
+        self.nodes.remove()
+        self.upper.remove()
+        self.lower.remove()
        
     def drawPlot(self):
         '''Draw the actual plot'''
+        
+        self.ax.set_title(label=self.parent.name, fontsize=18, y=1.03)
         
         x_window = 20                   # Num of ticks in 'viewport'
         pos = round(self.scale_pos*2)   # scale_pos is in seconds, pos is in ticks
@@ -537,26 +561,18 @@ class Plot():
             for tick in self.ax.get_xticklabels():
                 tick.set_rotation(45)
         
-        self.ax.set_ylim([-10,190])
-        self.ax.set_yticks(range(0,190,20))
-        
-        self.ax.grid(alpha=.5)
-        self.ax.set_title(label=self.parent.name)
-        self.ax.set_xlabel('Seconds')
-        self.ax.set_ylabel('Degree of Motion', fontname='BPG Courier GPL&GNU', fontsize=18)
-        
         # Plot upper and lower limits
-        upper = self.ax.plot(self.xs, [self.upper_limit for i in range(self.length)],
+        self.upper, = self.ax.plot(self.xs, [self.upper_limit for i in range(self.length)],
             'k--', alpha=.6, linewidth=1)
-        lower = self.ax.plot(self.xs, [self.lower_limit for i in range(self.length)],
+        self.lower, = self.ax.plot(self.xs, [self.lower_limit for i in range(self.length)],
             'k--', alpha=.6, linewidth=1)
         
         # Line
-        line = self.ax.plot(self.xs, self.ys, color='orange',
+        self.line, = self.ax.plot(self.xs, self.ys, color='orange',
             markersize=10)
             
         # Clickable nodes
-        nodes = self.ax.plot(self.xs, self.ys, 'k.', 
+        self.nodes, = self.ax.plot(self.xs, self.ys, 'k.', 
             markersize=10, picker=5.0)
             
     def onPress(self, event):
@@ -591,23 +607,20 @@ class Plot():
     
     def update(self):
         '''Re-draw plot after moving a point'''
-        self.ax.clear()
+
+        self.clearPlotLines()
+        
         self.drawPlot()
         self.fig.canvas.draw()        
-        
-    
 
 
 
 WIDTH = 1000
 HEIGHT = 600
-#~ TEMPLATE_FILE = 'pin_template.txt'
-TEMPLATE_FILE = 'combo_template.txt'
 
 if __name__ == '__main__':
     
     app = MainApp(WIDTH, HEIGHT)
-    app.main.mainloop()
     
     
     

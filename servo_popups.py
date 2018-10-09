@@ -105,7 +105,7 @@ class AboutPopup(Popup):
 class ValuePopup(Popup):
     '''Change value of individual node'''
     
-    def __init__(self, plot, node_index, title='Change Value', geometry='250x125'):
+    def __init__(self, plot, node_index, title='Change Value', geometry='240x125'):
         super().__init__(title, geometry)
         
         self.plot = plot
@@ -114,24 +114,32 @@ class ValuePopup(Popup):
         self.buildPage()
         
     def buildPage(self):
+        self.entry_value = tk.IntVar()
+        
         main_frame = ttk.Frame(self.dialog, padding=5)
         
         label = ttk.Label(main_frame, text='Enter a new value', font=(None, 12))
-        self.new_val_entry = ttk.Entry(main_frame, width=6)
+        self.new_val_entry = ttk.Entry(main_frame, width=6,
+            textvariable=self.entry_value)
+        self.entry_value.set(self.plot.ys[self.index])
         self.new_val_entry.focus()
         self.new_val_entry.bind('<Return>', self.update)
-        button = ttk.Button(main_frame, text='OK', command=self.update)
+        
+        ok_button = ttk.Button(main_frame, text='OK', command=self.update)
+        cancel_button = ttk.Button(main_frame, text='Cancel',
+            command=self.dialog.destroy)
     
         main_frame.pack(fill=tk.BOTH, expand=1)
         
         label.pack(padx=5, pady=5)
         self.new_val_entry.pack(pady=5)
-        button.pack(pady=5)
+        ok_button.pack(pady=5, side=tk.LEFT)
+        cancel_button.pack(pady=5, side=tk.RIGHT)
             
     def update(self, event=None):
         
         try:
-            new_value = int(self.new_val_entry.get())
+            new_value = int(self.entry_value.get())
             self.plot.ys[self.index] = self.plot.limit_range(new_value)
             self.plot.update()
             
