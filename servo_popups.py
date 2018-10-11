@@ -1,5 +1,7 @@
 
 import tkinter as tk
+
+from tkinter import messagebox
 from tkinter import ttk
 
 
@@ -13,8 +15,6 @@ class Popup():
         if geometry:
             self.dialog.geometry(geometry)
         self.dialog.resizable(False, False)
-        
-        #~ self.buildPage()
         
         # Freezes main window until popup is closed
         self.dialog.transient()
@@ -210,4 +210,126 @@ class LimitPopup(Popup):
         
         finally:
             self.dialog.destroy()
+            
+            
+class TimeAdjustPopup(Popup):
+    '''Add or remove time from the plot'''
+    
+    def __init__(self, plot, title='Adjust Routine Time'):
+        super().__init__(title)
+        
+        self.plot = plot
+        
+        self.buildPage()
+    
+    def buildPage(self):
+        self.time_entry_var = tk.IntVar()
+        self.where_var = tk.StringVar()
+        self.plus_minus_var = tk.StringVar()
+        
+        main_frame = ttk.Frame(self.dialog, padding=5)
+        
+        entry_frame = ttk.Frame(main_frame)
+        time_label = ttk.Label(entry_frame, text='Seconds   ')
+        time_entry = ttk.Entry(entry_frame, width=5,
+            textvariable=self.time_entry_var)
+        time_label.pack(side=tk.LEFT)
+        time_entry.pack(side=tk.LEFT)
+        
+        where = ttk.Labelframe(main_frame, text='Where:', width=25)
+        begin = ttk.Radiobutton(where, text = 'Beginning', value='begin',
+            variable=self.where_var)
+        end = ttk.Radiobutton(where, text= 'End', value='end',
+            variable=self.where_var)
+        begin.grid(sticky=tk.W)
+        end.grid(sticky=tk.W)
+        
+        plus_minus = ttk.Labelframe(main_frame, text = '+/-:', width=25)
+        add = ttk.Radiobutton(plus_minus, text = 'Add Time', value='add',
+            variable=self.plus_minus_var)
+        remove = ttk.Radiobutton(plus_minus, text= 'Remove Time',
+            value='subtract', variable=self.plus_minus_var)
+        add.grid(sticky=tk.W)
+        remove.grid(sticky=tk.W)
+        
+        button_frame = ttk.Frame(main_frame)
+        ok_button = ttk.Button(button_frame, text='OK', command=self.update)
+        cancel_button = ttk.Button(button_frame, text='Cancel',
+            command=lambda: self.dialog.destroy())
+        ok_button.pack(padx=5, side=tk.LEFT)
+        cancel_button.pack(padx=5, side=tk.RIGHT)
+        
+        main_frame.grid()
+        entry_frame.grid()
+        where.grid(row=1, column=0, pady=10)
+        plus_minus.grid(row=1, column=1, pady=10)
+        button_frame.grid(row=2, columnspan=2, pady=10)
+        
+    def update(self):
+        '''Make the changes to all tabs/plots'''
+
+        for plot_page in self.plot.parent.parent.plot_pages:
+        
+            # Add time
+            if self.plus_minus_var.get() == 'add':
+                
+                # Verify not going over 360 seconds total (Arduino memory limit)
+                temp_length = \
+                    ((len(plot_page.plot.ys)-1)/2) + (self.time_entry_var.get())
+                if temp_length * len(self.plot.parent.parent.plot_pages) > 360:
+                    messagebox.showerror('Limit Error', 'Total of all routines \
+                    must be less than 6 minutes \
+                    (360 seconds)')
+                    self.dialog.destroy()
+                    return
+                
+                temp_arr = [0 for i in range(self.time_entry_var.get() * 2)]
+                
+                if self.where_var.get() == 'begin':
+                    plot_page.plot.ys = temp_arr + plot_page.plot.ys
+                    plot_page.plot.length = len(plot_page.plot.ys)
+                    plot_page.plot.xs = [i for i in range(plot_page.plot.length)]
+                    
+                elif self.where_var.get() == 'end':
+                    plot_page.plot.ys += temp_arr
+                    plot_page.plot.length = len(plot_page.plot.ys)
+                    plot_page.plot.xs = [i for i in range(plot_page.plot.length)]
+            
+            # Remove time
+            if self.plus_minus_var.get() == 'subtract':
+                nodes_to_remove = self.time_entry_var.get() * 2
+                
+                # Verify plot will still exist
+                if nodes_to_remove >= plot_page.plot.length:
+                            messagebox.showerror('Error',
+                                'Removing too many seconds')
+                            return
+                            
+                if self.where_var.get() == 'begin':
+                    for i in range(nodes_to_remove):
+                        del plot_page.plot.ys[0]
+                    plot_page.plot.length = len(plot_page.plot.ys)
+                    plot_page.plot.xs = [i for i in range(plot_page.plot.length)]
+                    
+                elif self.where_var.get() == 'end':
+                    for i in range(nodes_to_remove):
+                        del plot_page.plot.ys[-1]
+                    plot_page.plot.length = len(plot_page.plot.ys)
+                    plot_page.plot.xs = [i for i in range(plot_page.plot.length)]
+            
+            # Update slider length
+            plot_page.slider['to'] = (plot_page.plot.length // 2) - 10
+            
+            # Redraw the plots
+            plot_page.plot.update()
+            
+        self.dialog.destroy()
+        
+        
+        
+    
+
+
+
+
 

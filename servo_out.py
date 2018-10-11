@@ -1,12 +1,12 @@
 
+import dill
 import jinja2
+import os
 
 from matplotlib import use as Use
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
-import dill
-import os
 from time import sleep
 
 import tkinter as tk
@@ -24,8 +24,6 @@ Use('TkAgg')
 
 class MainApp():
     def __init__(self, width=800, height=600):
-        
-        #~ self.template_file = template_file
         
         self.main = tk.Tk()
         self.main.title('Servo Programmer')
@@ -126,7 +124,6 @@ class SettingsPage(ttk.Frame):
         r_title = ttk.Label(right, text='Output', font=(None, 25))
         r_title.grid(columnspan=5, pady=20)
         
-        
         self.btn_check_var.set(False)
         button_checkbox = ttk.Checkbutton(right,
             text = 'Use button to Start Routine\n(Enter Button Number)',
@@ -200,8 +197,9 @@ class SettingsPage(ttk.Frame):
             if (self.num_of_servos.get() * \
                     self.num_of_seconds.get()) > 360:
                 self.resetEntries()
-                messagebox.showerror('Limit Error', 'Total routine length must \
-                    be less than 6 minutes (360 seconds)')
+                messagebox.showerror('Limit Error', 'Total of all routines \
+                    must be less than 6 minutes \
+                    (360 seconds)')
                 return
             
         except Exception as e:
@@ -430,12 +428,12 @@ class PlotPage(ttk.Frame):
         
         # To scroll along the plot
         # Upper limit is seconds minus half the length of the plot 'x_window'
-        slider = ttk.Scale(self, orient=tk.HORIZONTAL,
+        self.slider = ttk.Scale(self, orient=tk.HORIZONTAL,
             to=self.parent.num_of_seconds.get()-10,
             length=self.parent.parent_notebook.winfo_width())
         
         # Plot instance, bound to tab instance
-        self.plot = Plot(self, self.parent.num_of_seconds.get(), slider,
+        self.plot = Plot(self, self.parent.num_of_seconds.get(), self.slider,
             self.plot_num)
         
         # Drawing area for the graph
@@ -447,7 +445,6 @@ class PlotPage(ttk.Frame):
         
         pin_assign_frame = ttk.Frame(self, padding=10)
         pin_label = ttk.Label(pin_assign_frame, text='Pin # or address: ')
-        #~ self.pin_num = tk.IntVar()
         self.pin_entry = ttk.Entry(
             pin_assign_frame,
             width=5,
@@ -455,22 +452,25 @@ class PlotPage(ttk.Frame):
             textvariable=self.pin_num)
        
         button_frame = ttk.Frame(self, padding=10) 
-        self.rename_button = ttk.Button(button_frame, text='Change servo name',
+        rename_button = ttk.Button(button_frame, text='Change servo name',
             command=self.changeName)
-        self.change_limits_button = ttk.Button(button_frame, text='Change limits',
+        change_limits_button = ttk.Button(button_frame, text='Change limits',
             command = self.changeLimits)
+        time_adjust_button = ttk.Button(button_frame, text='Adjust Length',
+            command = lambda: TimeAdjustPopup(self.plot))
         
         # Grid widgets into tab
         canvas.get_tk_widget().grid(columnspan=3)
-        slider.grid(columnspan=3)
+        self.slider.grid(columnspan=3)
         
         pin_assign_frame.grid(sticky=tk.W)
         pin_label.grid()
         self.pin_entry.grid(row=0, column=1)
         
         button_frame.grid(row=2, column=2, sticky=tk.E)
-        self.change_limits_button.grid(padx=5)
-        self.rename_button.grid(row=0, column=1)
+        change_limits_button.pack(padx=5, pady=5, side=tk.RIGHT)
+        time_adjust_button.pack(padx=5, side=tk.RIGHT)
+        rename_button.pack(padx=5, side=tk.RIGHT)
 
     def changeName(self):
         '''Change plot title name and tab text'''
@@ -561,10 +561,10 @@ class Plot():
             for tick in self.ax.get_xticklabels():
                 tick.set_rotation(45)
         
-        # Plot upper and lower limits
-        self.upper, = self.ax.plot(self.xs, [self.upper_limit for i in range(self.length)],
+        #~ # Plot upper and lower limits
+        self.upper, = self.ax.plot(self.xs, [self.upper_limit for i in self.xs],
             'k--', alpha=.6, linewidth=1)
-        self.lower, = self.ax.plot(self.xs, [self.lower_limit for i in range(self.length)],
+        self.lower, = self.ax.plot(self.xs, [self.lower_limit for i in self.xs],
             'k--', alpha=.6, linewidth=1)
         
         # Line
@@ -574,7 +574,7 @@ class Plot():
         # Clickable nodes
         self.nodes, = self.ax.plot(self.xs, self.ys, 'k.', 
             markersize=10, picker=5.0)
-            
+   
     def onPress(self, event):
         '''Which node has been clicked'''
         
@@ -611,8 +611,8 @@ class Plot():
         self.clearPlotLines()
         
         self.drawPlot()
-        self.fig.canvas.draw()        
-
+        self.fig.canvas.draw()
+        
 
 
 WIDTH = 1000
