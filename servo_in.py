@@ -2,10 +2,15 @@
 import dill
 import jinja2
 import os
+import serial
+import traceback
 
 from matplotlib import use as Use
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
+from matplotlib.pyplot import pause
+
+from PIL import Image, ImageTk
 
 from time import sleep
 
@@ -17,6 +22,7 @@ from tkinter.ttk import Notebook
 
 from servo_popups import *
 
+from pprint import pprint
 
 # Needed to embed matplotlib in tkinter
 Use('TkAgg')
@@ -36,6 +42,12 @@ class MainApp():
         self.main.style.theme_use('clam')
         
         self.buildPage()
+        
+        # Substitute for mainloop
+        #~ while True:
+            #~ self.main.update_idletasks()
+            #~ self.main.update()
+            #~ self.settings_tab.checkRecordStatus()
         
         self.main.mainloop()
         
@@ -60,8 +72,8 @@ class MainApp():
             height=self.main.winfo_height())
         
         # Initial tab -----
-        settings_tab = SettingsPage(notebook)
-        notebook.add(settings_tab, text='Settings')
+        self.settings_tab = SettingsPage(notebook, self)
+        notebook.add(self.settings_tab, text='Settings')
         
         notebook.pack(anchor=tk.CENTER, fill=tk.BOTH)
         
@@ -72,12 +84,14 @@ class SettingsPage(ttk.Frame):
     plot_pages = []    # Used when outputting data
     millis = 15        # Delay between each inBetweener value
     load_flag = False
+    record_state = False
+    prev_record = False
     
-    def __init__(self, parent_notebook):
+    def __init__(self, parent_notebook, parent):
         super().__init__()
         
-        #~ self.template_file = template_file  # For outputting sketch
         self.parent_notebook = parent_notebook
+        self.parent = parent
 
         self.buildPage()
         
@@ -98,22 +112,23 @@ class SettingsPage(ttk.Frame):
         l_title.grid(columnspan=5, pady=20)
                 
         seconds_label = ttk.Label(left, text='Routine length (in seconds)\
-            \n(1-360):')
+            \n(1-360):', state='disabled')
         seconds_label.grid(padx=10, pady=15)
         
         self.seconds_entry = ttk.Entry(left, width=5, justify=tk.RIGHT,
-            textvariable = self.num_of_seconds)
+            textvariable = self.num_of_seconds, state='disabled')
         self.seconds_entry.grid(padx=25, pady=15, row=1, column=1)
         
-        servo_total_label = ttk.Label(left, text='Number of servos (1-8)')
+        servo_total_label = ttk.Label(left, text='Number of servos (1-8)',
+            state='disabled')
         servo_total_label.grid(padx=10, pady=15)
         
         self.servo_total_entry = ttk.Entry(left, width=5, justify=tk.RIGHT,
-            textvariable = self.num_of_servos)
+            textvariable = self.num_of_servos, state='disabled')
         self.servo_total_entry.grid(padx=25, pady=15, row=2, column=1)
         
         self.generate_plots_button = ttk.Button(left, text='Generate Plots',
-            command=self.generatePlots)
+            command=self.generatePlots, state='disabled')
         self.generate_plots_button.grid(padx=25, pady=25, row=1, column=2,
             rowspan=2)
         
@@ -128,8 +143,8 @@ class SettingsPage(ttk.Frame):
         button_checkbox = ttk.Checkbutton(right,
             text = 'Use button to Start Routine\n(Enter Button Number)',
             variable=self.btn_check_var,
-            command=self.toggle_btn_checkbox)
-        button_checkbox.grid()
+            command=self.toggleBtnCheckbox)
+        button_checkbox.grid(sticky=tk.W)
     
         self.button_entry = ttk.Entry(right, width=5, justify=tk.RIGHT,
             textvariable=self.button_entry_val, state='disabled')
@@ -155,13 +170,108 @@ class SettingsPage(ttk.Frame):
         self.save_button.grid(sticky=tk.W)
 
         self.load_button = ttk.Button(right, text='Load',
-            command=self.loadData)
+            command=self.loadData, state='disabled')
         self.load_button.grid(row=4, column=1)
 
-
+        # Images for the record button
+        record_image = Image.open('ignore_folder/record.png')
+        record_image.thumbnail((100, 100), Image.ANTIALIAS)
+        self.record_image = ImageTk.PhotoImage(record_image)
+        stop_image = Image.open('ignore_folder/stop.png')
+        stop_image.thumbnail((100, 100), Image.ANTIALIAS)
+        self.stop_image = ImageTk.PhotoImage(stop_image)
+        
+        self.record_button = ttk.Button(right, 
+            text='Record',
+            command=self.toggleRecording, 
+            compound=tk.BOTTOM,
+            image=self.record_image)
+        self.record_button.grid(row=5, columnspan=3, pady=50)
+        
         self.resetEntries()
     
-    def toggle_btn_checkbox(self):
+    def toggleRecording(self):
+        if self.record_state == True:
+            self.record_state = False
+            self.record_button['image'] = self.record_image
+            self.record_button['text'] = 'Record'
+        else:
+            self.record_state = True
+            self.record_button['image'] = self.stop_image
+            self.record_button['text'] = 'STOP'
+        
+        if self.record_state:
+            self.talkToArduino()    
+        
+    def talkToArduino(self):
+        try:
+            with serial.Serial('/dev/ttyUSB0', 9600) as self.arduino:
+                print('Waiting for Arduino')
+                sleep(2)   # Wait for arduino to be ready
+                
+                if not self.prev_record:
+                    # Only initialize once
+                    self.arduino.write(b'n') # Command arduino to send servo 
+                                             # count over serial
+                    
+                    num_servos = int(self.arduino.readline().decode())
+                    if num_servos > 8:
+                        messagebox.showerror('Error', '8 servos max')
+                        self.toggleRecording()
+                        return
+            
+                    self.generatePlots(num_servos)
+                    self.prev_record = True
+                
+                # Let tkinter do what it needs
+                self.parent.main.update_idletasks()
+                self.parent.main.update()
+    
+                # Send record signal
+                self.arduino.write(b'r')            
+                while self.record_state:
+                    if self.arduino.inWaiting() > 0:
+                        values = self.arduino.readline()
+                        values = values.strip()
+                        
+                        # Breakdown line of data into individual values
+                        new_ys = values.decode().strip(',').split(',')
+                         
+                        # Update all plots
+                        for index, data_point in enumerate(new_ys):
+                            plot = SettingsPage.plot_pages[index].plot
+                            
+                            if (len(self.plot_pages) * (plot.length//2)) > 360:
+                                self.toggleRecording()
+                                self.record_button['state'] = 'disabled'
+                                messagebox.showinfo('Memory Full',
+                                    'Total recording time limited to 360 seconds')
+                                break
+                            
+                            plot.ys.append(int(data_point))
+                            plot.xs =[i for i in range(len(plot.ys))]
+                            
+                            plot.length = len(plot.ys) + 1
+                            plot.parent.slider['to'] = (plot.length / 2) - 10
+                            plot.scale.set(len(plot.ys))
+                            
+                            plot.update()
+                        
+                        # Let tkinter do what it needs
+                        self.parent.main.update_idletasks()
+                        self.parent.main.update()
+                
+                # Command arduino to stop sending values        
+                if not self.record_state:
+                    self.arduino.write(b's')
+                            
+        except Exception as e:
+            print('Something went wrong')
+            print(e)
+            print(traceback.format_exc())
+            return
+ 
+    def toggleBtnCheckbox(self):
         '''Toggle state of button entry based on checkbox'''
         
         if self.btn_check_var.get():
@@ -177,93 +287,20 @@ class SettingsPage(ttk.Frame):
         self.num_of_servos.set(1)
         self.button_entry_val.set('None')
         
-    def generatePlots(self):
+    def generatePlots(self, numServos):
         '''
         Generate specified number of Plot tabs each containing a plot
-        of the specified routine length
+        for recording
         '''
-        
-        try:    # Error checking inputs
-            limit = lambda n, n_min, n_max: max(min(n, n_max), n_min)
+
+        # Generate tabs/plots from inputs
+        for i in range(numServos):
+            tab_title = 'Servo{}'.format(i+1)
+            tab_name = tab_title + '_tab'
+            setattr(self, tab_name, PlotPage(self, tab_title))
+            self.parent_notebook.add(getattr(self,tab_name), text=tab_title)
+            SettingsPage.plot_pages.append(getattr(self,tab_name))
             
-            # Routine between 1 and 360 seconds
-            temp_secs= self.num_of_seconds.get()
-            self.num_of_seconds.set(limit(temp_secs, 1, 360))
-            
-            # Maximum of 8 servos
-            temp_servos = self.num_of_servos.get()
-            self.num_of_servos.set(limit(temp_servos, 1, 8))
-            
-            if (self.num_of_servos.get() * \
-                    self.num_of_seconds.get()) > 360:
-                self.resetEntries()
-                messagebox.showerror('Limit Error', 'Total of all routines \
-                    must be less than 6 minutes \
-                    (360 seconds)')
-                return
-            
-        except Exception as e:
-            print(e)
-            messagebox.showerror(title='Error!', message='Inputs must be numbers')
-            self.resetEntries()
-        
-        else:
-            if self.load_flag:
-                # Use attribute 'settings' from self.loadData
-                
-                # Fill entry boxes with values
-                if self.settings['button_#'] == 'None':
-                    self.btn_check_var.set(False)
-                else:
-                    self.btn_check_var.set(True)
-                    self.button_entry_val.set(self.settings['button_#'])
-                if self.settings['output_type'] == 'i2c':
-                    self.i2c.invoke()
-                else:
-                    self.pins.invoke()
-                self.toggle_btn_checkbox()
-                self.num_of_seconds.set(self.settings['seconds'])
-                self.num_of_servos.set(len(self.settings['plot_pages']))
-                
-                # Generate tabs/plots using loaded data
-                temp_page_list = self.settings['plot_pages']
-                for i in range(self.num_of_servos.get()):
-                    name = temp_page_list[i][0]
-                    tab = 'self.{}_tab'.format(name)
-                    tab = PlotPage(self, name)
-                    self.parent_notebook.add(tab, text=name)
-                    SettingsPage.plot_pages.append(tab)
-                    
-                    for index, page in enumerate(SettingsPage.plot_pages):
-                        page.pin_num.set(temp_page_list[index][1])
-                        page.plot.ys = temp_page_list[index][2]
-                        page.plot.update()
-                        page.parent.parent_notebook.tab(index+1, text=page.name)
-            else:
-                #~ # Generate tabs/plots from inputs
-                #~ for i in range(self.num_of_servos.get()):
-                    #~ tab_name = 'Servo{}'.format(i+1)
-                    #~ tab = 'self.{}_tab'.format(tab_name)
-                    #~ tab = PlotPage(self, tab_name)
-                    #~ self.parent_notebook.add(tab, text=tab_name)
-                    #~ SettingsPage.plot_pages.append(tab)
-            
-                # Generate tabs/plots from inputs
-                for i in range(self.num_of_servos.get()):
-                    tab_title = 'Servo{}'.format(i+1)
-                    tab_name = tab_title + '_tab'
-                    setattr(self, tab_name, PlotPage(self, tab_title))
-                    self.parent_notebook.add(getattr(self,tab_name), text=tab_title)
-                    SettingsPage.plot_pages.append(getattr(self,tab_name))
-            
-            self.generate_plots_button['state']='disabled'
-            self.seconds_entry['state']='disabled'
-            self.servo_total_entry['state']='disabled'
-            
-            self.save_button['state'] = 'normal'
-            self.load_button['state'] = 'disabled'
-            self.output_button['state'] = 'normal'
-    
     def outputSketch(self):
         '''
         Output all data into a usable Arduino sketch
@@ -586,7 +623,7 @@ class Plot():
         
         else:
             # If node is double-clicked open popup to change value
-            sleep(.1)  # Needs short delay to end all events on mainloop
+            sleep(.1)  # Short delay to end all events on mainloop
             ValuePopup(self, self.point_index)
         
     def onMotion(self, event):
