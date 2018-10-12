@@ -306,18 +306,17 @@ class TimeAdjustPopup(Popup):
                             return
                             
                 if self.where_var.get() == 'begin':
-                    for i in range(nodes_to_remove):
-                        del plot_page.plot.ys[0]
+                    del plot_page.plot.ys[:nodes_to_remove]
                     plot_page.plot.length = len(plot_page.plot.ys)
                     plot_page.plot.xs = [i for i in range(plot_page.plot.length)]
                     
                 elif self.where_var.get() == 'end':
-                    for i in range(nodes_to_remove):
-                        del plot_page.plot.ys[-1]
+                    del plot_page.plot.ys[-nodes_to_remove:]
                     plot_page.plot.length = len(plot_page.plot.ys)
                     plot_page.plot.xs = [i for i in range(plot_page.plot.length)]
             
-            # Update slider length
+            # Update slider length to scroll along the plot
+            # Upper limit is seconds minus half the length of the plot 'x_window'
             plot_page.slider['to'] = (plot_page.plot.length // 2) - 10
             
             # Redraw the plots
