@@ -300,7 +300,7 @@ class SettingsPage(ttk.Frame):
             #~ plot.length = len(plot.ys) + 1
             plot.parent.slider['to'] = (len(plot.ys) / 2) - 10
             plot.scale.set(len(plot.ys))
-            self.num_of_seconds.set((len(plot.ys)-1)/2)
+            self.num_of_seconds.set(int((len(plot.ys)-1)/2))
             
             plot.update()
  
