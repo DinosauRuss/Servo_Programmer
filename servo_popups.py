@@ -5,20 +5,20 @@ from tkinter import messagebox
 from tkinter import ttk
 
 
-class Popup():
+class Popup(tk.Toplevel):
     '''Generic top level pop-up window'''
 
     def __init__(self, title='This is a Title', geometry=None):
-        # Create new top-level window
-        self.dialog=tk.Toplevel()
-        self.dialog.title(title)
+        super().__init__()
+        
+        self.title(title)
         if geometry:
-            self.dialog.geometry(geometry)
-        self.dialog.resizable(False, False)
+            self.geometry(geometry)
+        self.resizable(False, False)
         
         # Freezes main window until popup is closed
-        self.dialog.transient()
-        self.dialog.grab_set()
+        self.transient()
+        self.grab_set()
         
     def buildPage(self):
         pass
@@ -37,16 +37,16 @@ class NamePopup(Popup):
         self.buildPage()
         
     def buildPage(self):    
-        self.name_entry = ttk.Entry(self.dialog)
+        self.name_entry = ttk.Entry(self)
         self.name_entry.focus()
         self.name_entry.bind('<Return>', self.update)
         
-        button_frame = ttk.Frame(self.dialog)
+        button_frame = ttk.Frame(self)
         
         ok_button = ttk.Button(button_frame, text='Ok',width=5, 
             command=self.update)
         cancel_button = ttk.Button(button_frame, text='Cancel', width=5,
-            command=self.dialog.destroy)
+            command=self.destroy)
         
         self.name_entry.pack(pady=15)
         button_frame.pack()
@@ -62,15 +62,15 @@ class NamePopup(Popup):
         for tab in self.page.parent.plot_pages:
             if name == tab.name:
                 messagebox.showerror('Error!', 'Names must be unique')
-                self.dialog.destroy()
+                self.destroy()
                 return
         if name:
             self.page.parent.parent_notebook.tab(self.page.plot_num, text=name)
             self.page.name = name
             self.page.plot.update()
-            self.dialog.destroy()    
+            self.destroy()    
         else:
-            self.dialog.destroy()
+            self.destroy()
 
 
 class AboutPopup(Popup):
@@ -82,25 +82,23 @@ class AboutPopup(Popup):
         self.buildPage()
         
     def buildPage(self):
-        main_frame = ttk.Frame(self.dialog)
+        main_frame = ttk.Frame(self)
         
         title = ttk.Label(main_frame, text='Made by REK', font=(None, 14))
         title.pack(expand=1)
         
         button_frame = ttk.Frame(main_frame)
         
-        help_button = ttk.Button(button_frame, text='Help', width=10)
+        help_button = ttk.Button(button_frame, text='Help', width=10,
+            command=lambda: HelpPopup('Info', filename='help_file.txt'))
         ok_button = ttk.Button(button_frame, text='OK', width=10,
-            command=self.close)
+            command=self.destroy)
         
         main_frame.pack(fill=tk.BOTH, expand=1)
         help_button.pack(padx=5, side=tk.LEFT)
         ok_button.pack(padx=5, side=tk.RIGHT)
         button_frame.pack(side=tk.BOTTOM, pady=10)
     
-    def close(self):
-        self.dialog.destroy()
-
 
 class ValuePopup(Popup):
     '''Change value of individual node'''
@@ -116,7 +114,7 @@ class ValuePopup(Popup):
     def buildPage(self):
         self.entry_value = tk.IntVar()
         
-        main_frame = ttk.Frame(self.dialog, padding=5)
+        main_frame = ttk.Frame(self, padding=5)
         
         label = ttk.Label(main_frame, text='Enter a new value', font=(None, 12))
         self.new_val_entry = ttk.Entry(main_frame, width=6,
@@ -127,7 +125,7 @@ class ValuePopup(Popup):
         
         ok_button = ttk.Button(main_frame, text='OK', command=self.update)
         cancel_button = ttk.Button(main_frame, text='Cancel',
-            command=self.dialog.destroy)
+            command=self.destroy)
     
         main_frame.pack(fill=tk.BOTH, expand=1)
         
@@ -147,7 +145,7 @@ class ValuePopup(Popup):
             print('VAL ERROR: ', e)
         
         finally:
-            self.dialog.destroy()
+            self.destroy()
 
 
 class LimitPopup(Popup):
@@ -162,9 +160,8 @@ class LimitPopup(Popup):
         
         self.buildPage()
         
-        
     def buildPage(self):
-        main_frame = ttk.Frame(self.dialog, padding=5)
+        main_frame = ttk.Frame(self, padding=5)
         
         title = ttk.Label(main_frame, text='Enter new values', font=(None, 12))
         
@@ -202,16 +199,15 @@ class LimitPopup(Popup):
             self.plot.lower_limit = limit(
                 self.plot.lower_limit, 0, self.plot.upper_limit-5)
             
-            
             self.plot.update()
             
         except Exception as e:
             print('VAL ERROR: ', e)
         
         finally:
-            self.dialog.destroy()
+            self.destroy()
             
-            
+
 class TimeAdjustPopup(Popup):
     '''Add or remove time from the plot'''
     
@@ -227,7 +223,7 @@ class TimeAdjustPopup(Popup):
         self.where_var = tk.StringVar()
         self.plus_minus_var = tk.StringVar()
         
-        main_frame = ttk.Frame(self.dialog, padding=5)
+        main_frame = ttk.Frame(self, padding=5)
         
         entry_frame = ttk.Frame(main_frame)
         time_label = ttk.Label(entry_frame, text='Seconds   ')
@@ -255,7 +251,7 @@ class TimeAdjustPopup(Popup):
         button_frame = ttk.Frame(main_frame)
         ok_button = ttk.Button(button_frame, text='OK', command=self.update)
         cancel_button = ttk.Button(button_frame, text='Cancel',
-            command=lambda: self.dialog.destroy())
+            command=lambda: self.destroy())
         ok_button.pack(padx=5, side=tk.LEFT)
         cancel_button.pack(padx=5, side=tk.RIGHT)
         
@@ -280,7 +276,7 @@ class TimeAdjustPopup(Popup):
                     messagebox.showerror('Limit Error', 'Total of all routines \
                     must be less than 6 minutes \
                     (360 seconds)')
-                    self.dialog.destroy()
+                    self.destroy()
                     return
                 
                 temp_arr = [0 for i in range(self.time_entry_var.get() * 2)]
@@ -301,9 +297,10 @@ class TimeAdjustPopup(Popup):
                 
                 # Verify plot will still exist
                 if nodes_to_remove >= plot_page.plot.length:
-                            messagebox.showerror('Error',
-                                'Removing too many seconds')
-                            return
+                    messagebox.showerror('Error',
+                        'Removing too many seconds')
+                    self.destroy()
+                    return
                             
                 if self.where_var.get() == 'begin':
                     del plot_page.plot.ys[:nodes_to_remove]
@@ -319,15 +316,69 @@ class TimeAdjustPopup(Popup):
             # Upper limit is seconds minus half the length of the plot 'x_window'
             plot_page.slider['to'] = (plot_page.plot.length // 2) - 10
             plot_page.slider.set(0)
-            plot_page.parent.num_of_seconds.set((len(plot_page.plot.ys)-1)/2)
+            plot_page.parent.num_of_seconds.set(int((len(plot_page.plot.ys)-1)/2))
             
             # Redraw the plots
             plot_page.plot.update()
             
-        self.dialog.destroy()
+        self.destroy()
         
         
+class HelpPopup(Popup):
+    """A simple text viewer dialog for IDLE
+    """
+    def __init__(self, title, filename=None):
         
+        super().__init__()
+        
+        self.text = self.view_file(filename)
+        
+        self.configure(borderwidth=5)
+        self.geometry('500x400')
+
+        self.title(title)
+        self.bind('<Return>', lambda x: self.destroy())
+        self.bind('<Escape>', lambda x: self.destroy())
+        
+        self.buildPage()
+        
+        self.transient()
+        self.grab_set()
+        self.wait_window()
+
+    def buildPage(self):
+        text_frame = ttk.Frame(self, relief=tk.SUNKEN)
+        button_frame = ttk.Frame(self)
+        
+        ok_button = ttk.Button(button_frame, text='Close',
+                               command=self.destroy, takefocus=tk.FALSE)
+        scrollbar = ttk.Scrollbar(text_frame, orient=tk.VERTICAL,
+                                       takefocus=tk.FALSE)
+        self.text_view = tk.Text(text_frame, wrap=tk.WORD,
+                             bg='#ffffff', fg='#000000')
+        self.text_view.insert(0.0, self.text)
+        self.text_view.config(state=tk.DISABLED)
+                             
+        scrollbar.config(command=self.text_view.yview)
+        self.text_view.config(yscrollcommand=scrollbar.set)
+        
+        text_frame.pack(side=tk.TOP,expand=tk.TRUE,fill=tk.BOTH)
+        button_frame.pack(side=tk.BOTTOM,fill=tk.X)
+        
+        ok_button.pack()
+        scrollbar.pack(side=tk.RIGHT,fill=tk.Y)
+        self.text_view.pack(side=tk.LEFT,expand=tk.TRUE,fill=tk.BOTH)
+        
+        
+
+    @staticmethod
+    def view_file(filename):
+        try:
+            with open(filename, 'r') as infile:
+                return infile.read()
+        except IOError:
+            messagebox.showerror(title='File Load Error',
+                message='Unable to load file {} '.format(filename))       
     
 
 
