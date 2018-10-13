@@ -32,7 +32,7 @@ class MainApp():
     def __init__(self, width=800, height=600):
         
         self.main = tk.Tk()
-        self.main.title('Servo Programmer')
+        self.main.title('Servo Input Recorder')
         self.main.geometry('{}x{}'.format(width, height))
         self.main.resizable(False, False)
         self.main.update()
@@ -43,12 +43,7 @@ class MainApp():
         
         self.buildPage()
         
-        # Substitute for mainloop
-        #~ while True:
-            #~ self.main.update_idletasks()
-            #~ self.main.update()
-            #~ self.settings_tab.checkRecordStatus()
-        
+        self.main.protocol("WM_DELETE_WINDOW", self.onClose)
         self.main.mainloop()
         
     def buildPage(self):
@@ -76,6 +71,14 @@ class MainApp():
         notebook.add(self.settings_tab, text='Settings')
         
         notebook.pack(anchor=tk.CENTER, fill=tk.BOTH)
+    
+    def onClose(self):
+        '''Close communication w/ arduino before closing app'''
+        
+        if self.settings_tab.record_state:
+            messagebox.showerror('Error', 'Please stop recording first')
+        else:    
+            self.main.destroy()
         
 
 class SettingsPage(ttk.Frame):
@@ -83,7 +86,6 @@ class SettingsPage(ttk.Frame):
 
     plot_pages = []    # Used when outputting data
     millis = 15        # Delay between each inBetweener value
-    load_flag = False
     record_state = False
     prev_record = False
     
@@ -149,6 +151,7 @@ class SettingsPage(ttk.Frame):
         self.button_entry = ttk.Entry(right, width=5, justify=tk.RIGHT,
             textvariable=self.button_entry_val, state='disabled')
         self.button_entry.grid(padx=25, pady=5, row=1, column=1)
+        self.button_entry_val.set('None')
         
         output_choice = ttk.LabelFrame(right, text='Servo Control Method')
         output_choice.grid(pady=15, sticky=tk.W)
@@ -187,90 +190,7 @@ class SettingsPage(ttk.Frame):
             compound=tk.BOTTOM,
             image=self.record_image)
         self.record_button.grid(row=5, columnspan=3, pady=50)
-        
-        self.resetEntries()
     
-    def toggleRecording(self):
-        if self.record_state == True:
-            self.record_state = False
-            self.record_button['image'] = self.record_image
-            self.record_button['text'] = 'Record'
-        else:
-            self.record_state = True
-            self.record_button['image'] = self.stop_image
-            self.record_button['text'] = 'STOP'
-        
-        if self.record_state:
-            self.talkToArduino()    
-        
-    def talkToArduino(self):
-        try:
-            with serial.Serial('/dev/ttyUSB0', 9600) as self.arduino:
-                print('Waiting for Arduino')
-                sleep(2)   # Wait for arduino to be ready
-                
-                if not self.prev_record:
-                    # Only initialize once
-                    self.arduino.write(b'n') # Command arduino to send servo 
-                                             # count over serial
-                    
-                    num_servos = int(self.arduino.readline().decode())
-                    if num_servos > 8:
-                        messagebox.showerror('Error', '8 servos max')
-                        self.toggleRecording()
-                        return
-            
-                    self.generatePlots(num_servos)
-                    self.prev_record = True
-                
-                # Let tkinter do what it needs
-                self.parent.main.update_idletasks()
-                self.parent.main.update()
-    
-                # Send record signal
-                self.arduino.write(b'r')            
-                while self.record_state:
-                    if self.arduino.inWaiting() > 0:
-                        values = self.arduino.readline()
-                        values = values.strip()
-                        
-                        # Breakdown line of data into individual values
-                        new_ys = values.decode().strip(',').split(',')
-                         
-                        # Update all plots
-                        for index, data_point in enumerate(new_ys):
-                            plot = SettingsPage.plot_pages[index].plot
-                            
-                            if (len(self.plot_pages) * (plot.length//2)) > 360:
-                                self.toggleRecording()
-                                self.record_button['state'] = 'disabled'
-                                messagebox.showinfo('Memory Full',
-                                    'Total recording time limited to 360 seconds')
-                                break
-                            
-                            plot.ys.append(int(data_point))
-                            plot.xs =[i for i in range(len(plot.ys))]
-                            
-                            plot.length = len(plot.ys) + 1
-                            plot.parent.slider['to'] = (plot.length / 2) - 10
-                            plot.scale.set(len(plot.ys))
-                            
-                            plot.update()
-                        
-                        # Let tkinter do what it needs
-                        self.parent.main.update_idletasks()
-                        self.parent.main.update()
-                
-                # Command arduino to stop sending values        
-                if not self.record_state:
-                    self.arduino.write(b's')
-                            
-        except Exception as e:
-            print('Something went wrong')
-            print(e)
-            print(traceback.format_exc())
-            return
- 
     def toggleBtnCheckbox(self):
         '''Toggle state of button entry based on checkbox'''
         
@@ -280,13 +200,122 @@ class SettingsPage(ttk.Frame):
             self.button_entry.configure(state='disabled')
             self.button_entry_val.set('None')
     
-    def resetEntries(self):
-        '''Clear the entry widgets'''
+    def toggleRecording(self):
+        if self.record_state == True:
+            self.record_state = False
+            self.record_button['image'] = self.record_image
+            self.record_button['text'] = 'Record'
+            
+            self.save_button['state'] = 'normal'
+            self.output_button['state'] = 'normal'
+        else:
+            self.record_state = True
+            self.record_button['image'] = self.stop_image
+            self.record_button['text'] = 'STOP'
         
-        self.num_of_seconds.set(1)
-        self.num_of_servos.set(1)
-        self.button_entry_val.set('None')
+        if self.record_state:
+            self.talkToArduino()    
+    
+    def initializeArduino(self):
+        '''Initialize required number of tabs/plots'''
         
+        self.arduino.write(b'n') # Command arduino to send servo count 
+                
+        num_servos = int(self.arduino.readline().decode())
+        if num_servos > 8:
+            messagebox.showerror('Error', '8 servos max')
+            self.toggleRecording()
+            return
+        
+        self.generatePlots(num_servos)
+        self.prev_record = True
+                
+        # Let tkinter do what it needs
+        self.parent.main.update_idletasks()
+        self.parent.main.update()
+        
+    def talkToArduino(self):
+        '''Open serial line with Arduino and read values.
+           Arduino sketch expects 'r' to start sending values
+           and 's' to stop sending values'''
+        try:
+            with serial.Serial('/dev/ttyUSB0', 9600) as self.arduino:
+                print('Waiting for Arduino')
+                sleep(2)   # Wait for arduino to be ready
+                
+                if not self.prev_record:
+                    self.initializeArduino()
+                
+                # Disable buttons while recording    
+                self.toggleButtonStates()
+    
+                # Send record signal
+                self.arduino.write(b'r')            
+                while self.record_state:
+                    if self.arduino.inWaiting() > 0:
+                        
+                        values = self.arduino.readline()
+                        values = values.strip()
+                        # Breakdown line of data into individual values
+                        new_ys = values.decode().strip(',').split(',')
+                        
+                        self.updatePlotData(new_ys)
+                        
+                        # Let tkinter do what it needs while stuck in this loop
+                        self.parent.main.update_idletasks()
+                        self.parent.main.update()
+                
+                # Command arduino to stop sending values        
+                if not self.record_state:
+                    self.arduino.write(b's')
+                
+                # Re-enable buttons
+                self.toggleButtonStates()
+                
+        except serial.SerialException as e:
+            self.toggleRecording()
+            print(e)
+            messagebox.showerror('Error', 'Cannot find Arduino')
+        except Exception as e:
+            self.toggleRecording()
+            print('Something went wrong')
+            print(e)
+            print(traceback.format_exc())
+ 
+    def updatePlotData(self, newYs):
+        # Update all plots
+        for index, data_point in enumerate(newYs):
+            plot = SettingsPage.plot_pages[index].plot
+            
+            if (len(self.plot_pages) * ((len(plot.ys)-1)/2)) >= 360:
+                self.toggleRecording()
+                self.record_button['state'] = 'disabled'
+                messagebox.showinfo('Memory Full',
+                    'Total recording time limited to 360 seconds')
+                break
+            
+            plot.ys.append(int(data_point))
+            plot.xs =[i for i in range(len(plot.ys))]
+            
+            #~ plot.length = len(plot.ys) + 1
+            plot.parent.slider['to'] = (len(plot.ys) / 2) - 10
+            plot.scale.set(len(plot.ys))
+            self.num_of_seconds.set((len(plot.ys)-1)/2)
+            
+            plot.update()
+ 
+    def toggleButtonStates(self):
+        if self.record_state:
+            for page in self.plot_pages:
+                page.rename_button['state'] = 'disabled'
+                page.change_limits_button['state'] = 'disabled'
+                page.time_adjust_button['state'] = 'disabled'
+        else:
+            for page in self.plot_pages:
+                page.rename_button['state'] = 'normal'
+                page.change_limits_button['state'] = 'normal'
+                page.time_adjust_button['state'] = 'normal'
+
     def generatePlots(self, numServos):
         '''
         Generate specified number of Plot tabs each containing a plot
@@ -496,11 +525,11 @@ class PlotPage(ttk.Frame):
             textvariable=self.pin_num)
        
         button_frame = ttk.Frame(self, padding=10) 
-        rename_button = ttk.Button(button_frame, text='Change servo name',
+        self.rename_button = ttk.Button(button_frame, text='Change servo name',
             command=lambda: NamePopup(self))
-        change_limits_button = ttk.Button(button_frame, text='Change limits',
+        self.change_limits_button = ttk.Button(button_frame, text='Change limits',
             command = lambda: LimitPopup(self.plot))
-        time_adjust_button = ttk.Button(button_frame, text='Adjust Length',
+        self.time_adjust_button = ttk.Button(button_frame, text='Adjust Length',
             command = lambda: TimeAdjustPopup(self.plot))
         
         # Grid widgets into tab
@@ -512,9 +541,9 @@ class PlotPage(ttk.Frame):
         self.pin_entry.grid(row=0, column=1)
         
         button_frame.grid(row=2, column=2, sticky=tk.E)
-        change_limits_button.pack(padx=5, pady=5, side=tk.RIGHT)
-        time_adjust_button.pack(padx=5, side=tk.RIGHT)
-        rename_button.pack(padx=5, side=tk.RIGHT)
+        self.change_limits_button.pack(padx=5, pady=5, side=tk.RIGHT)
+        self.time_adjust_button.pack(padx=5, side=tk.RIGHT)
+        self.rename_button.pack(padx=5, side=tk.RIGHT)
 
 
 class Plot():
@@ -530,7 +559,7 @@ class Plot():
         
         self.scale_pos = 0
         self.num = num                 # Which number servo, for plot title
-        self.length = (seconds*2)+1    # Number of nodes in plot, 2 per second
+        self.length = 0
         
         self.click = False             # Node follows mouse only when clicked
         self.point_index = None        # Track which node has been selected
@@ -592,7 +621,8 @@ class Plot():
         self.ax.set_xlim([pos-.5, pos+x_window+.5])
         self.ax.set_xticks([i for i in range(pos, pos+x_window+1)])
         self.ax.set_xticklabels([i/2 for i in self.ax.get_xticks()])
-        if self.length > 201:
+        #~ if self.length > 201:
+        if len(self.ys) > 201:
             for tick in self.ax.get_xticklabels():
                 tick.set_rotation(45)
         
