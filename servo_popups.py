@@ -318,6 +318,8 @@ class TimeAdjustPopup(Popup):
             # Update slider length to scroll along the plot
             # Upper limit is seconds minus half the length of the plot 'x_window'
             plot_page.slider['to'] = (plot_page.plot.length // 2) - 10
+            plot_page.slider.set(0)
+            plot_page.parent.num_of_seconds.set((len(plot_page.plot.ys)-1)/2)
             
             # Redraw the plots
             plot_page.plot.update()
