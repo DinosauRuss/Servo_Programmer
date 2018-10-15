@@ -18,11 +18,11 @@ import tkinter as tk
 import tkinter.ttk as ttk
 import tkinter.filedialog as fd
 from tkinter import messagebox
-from tkinter.ttk import Notebook
 
 from servo_popups import *
+from settings_popup import *
 
-from pprint import pprint
+#~ from pprint import pprint
 
 # Needed to embed matplotlib in tkinter
 Use('TkAgg')
@@ -63,7 +63,7 @@ class MainApp():
         self.main.config(menu=menubar)
         
         # ----- Notebook/tab configuration -----    
-        notebook = Notebook(self.main, width=self.main.winfo_width(),
+        notebook = ttk.Notebook(self.main, width=self.main.winfo_width(),
             height=self.main.winfo_height())
         
         # Initial tab -----
@@ -177,10 +177,10 @@ class SettingsPage(ttk.Frame):
         self.load_button.grid(row=4, column=1)
 
         # Images for the record button
-        record_image = Image.open('ignore_folder/record.png')
+        record_image = Image.open('resources/record.png')
         record_image.thumbnail((100, 100), Image.ANTIALIAS)
         self.record_image = ImageTk.PhotoImage(record_image)
-        stop_image = Image.open('ignore_folder/stop.png')
+        stop_image = Image.open('resources/stop.png')
         stop_image.thumbnail((100, 100), Image.ANTIALIAS)
         self.stop_image = ImageTk.PhotoImage(stop_image)
         
@@ -213,6 +213,9 @@ class SettingsPage(ttk.Frame):
             self.record_button['image'] = self.stop_image
             self.record_button['text'] = 'STOP'
         
+            self.save_button['state'] = 'disabled'
+            self.output_button['state'] = 'disabled'
+        
         if self.record_state:
             self.talkToArduino()    
     
@@ -220,14 +223,22 @@ class SettingsPage(ttk.Frame):
         '''Initialize required number of tabs/plots'''
         
         self.arduino.write(b'n') # Command arduino to send servo count 
+        
+        #####
+        values = self.arduino.readline()
+        values = values.strip()
+        # Breakdown line of data into individual values
+        new_tabs = values.decode().strip(',').split(',')
+        num_servos = len(new_tabs)
+        ####
                 
-        num_servos = int(self.arduino.readline().decode())
         if num_servos > 8:
             messagebox.showerror('Error', '8 servos max')
             self.toggleRecording()
             return
         
-        self.generatePlots(num_servos)
+        self.num_of_servos.set(num_servos)
+        self.generatePlots(new_tabs)
         self.prev_record = True
                 
         # Let tkinter do what it needs
@@ -307,28 +318,30 @@ class SettingsPage(ttk.Frame):
     def toggleButtonStates(self):
         if self.record_state:
             for page in self.plot_pages:
-                page.rename_button['state'] = 'disabled'
-                page.change_limits_button['state'] = 'disabled'
-                page.time_adjust_button['state'] = 'disabled'
+                #~ page.rename_button['state'] = 'disabled'
+                #~ page.change_limits_button['state'] = 'disabled'
+                #~ page.time_adjust_button['state'] = 'disabled'
+                page.settings_button['state'] = 'disabled'
         else:
             for page in self.plot_pages:
-                page.rename_button['state'] = 'normal'
-                page.change_limits_button['state'] = 'normal'
-                page.time_adjust_button['state'] = 'normal'
+                #~ page.rename_button['state'] = 'normal'
+                #~ page.change_limits_button['state'] = 'normal'
+                #~ page.time_adjust_button['state'] = 'normal'
+                page.settings_button['state'] = 'normal'
 
-    def generatePlots(self, numServos):
+    def generatePlots(self, servos):
         '''
-        Generate specified number of Plot tabs each containing a plot
-        for recording
+        Generate specified number of Plot tabs with correct name,
+        each containing a plot for recording
         '''
 
-        # Generate tabs/plots from inputs
-        for i in range(numServos):
-            tab_title = 'Servo{}'.format(i+1)
+        # Generate tabs/plots from Arduino info
+        for i in servos:
+            tab_title = i
             tab_name = tab_title + '_tab'
             setattr(self, tab_name, PlotPage(self, tab_title))
-            self.parent_notebook.add(getattr(self,tab_name), text=tab_title)
-            SettingsPage.plot_pages.append(getattr(self,tab_name))
+            self.parent_notebook.add(getattr(self, tab_name), text=tab_title)
+            SettingsPage.plot_pages.append(getattr(self, tab_name))
             
     def outputSketch(self):
         '''
@@ -525,12 +538,9 @@ class PlotPage(ttk.Frame):
             textvariable=self.pin_num)
        
         button_frame = ttk.Frame(self, padding=10) 
-        self.rename_button = ttk.Button(button_frame, text='Change servo name',
-            command=lambda: NamePopup(self))
-        self.change_limits_button = ttk.Button(button_frame, text='Change limits',
-            command = lambda: LimitPopup(self.plot))
-        self.time_adjust_button = ttk.Button(button_frame, text='Adjust Length',
-            command = lambda: TimeAdjustPopup(self.plot))
+        
+        self.settings_button = ttk.Button(button_frame, text='Settings',
+            command=self.settingsDisplay)
         
         # Grid widgets into tab
         canvas.get_tk_widget().grid(columnspan=3)
@@ -541,10 +551,16 @@ class PlotPage(ttk.Frame):
         self.pin_entry.grid(row=0, column=1)
         
         button_frame.grid(row=2, column=2, sticky=tk.E)
-        self.change_limits_button.pack(padx=5, pady=5, side=tk.RIGHT)
-        self.time_adjust_button.pack(padx=5, side=tk.RIGHT)
-        self.rename_button.pack(padx=5, side=tk.RIGHT)
 
+        self.settings_button.pack(padx=5, side=tk.RIGHT)
+
+    def settingsDisplay(self):
+        popup = SettingsPopup()
+        
+        popup.addTab(NamePage(self, popup), 'Change Title')
+        popup.addTab(TimeAdjustPage(self, popup), 'Adjust Time')
+        popup.addTab(LimitPage(self.plot, popup), 'Adjust Limits')
+    
 
 class Plot():
     '''
@@ -621,10 +637,8 @@ class Plot():
         self.ax.set_xlim([pos-.5, pos+x_window+.5])
         self.ax.set_xticks([i for i in range(pos, pos+x_window+1)])
         self.ax.set_xticklabels([i/2 for i in self.ax.get_xticks()])
-        #~ if self.length > 201:
-        if len(self.ys) > 201:
-            for tick in self.ax.get_xticklabels():
-                tick.set_rotation(45)
+        for tick in self.ax.get_xticklabels():
+            tick.set_rotation(45)
         
         #~ # Plot upper and lower limits
         self.upper, = self.ax.plot(self.xs, [self.upper_limit for i in self.xs],

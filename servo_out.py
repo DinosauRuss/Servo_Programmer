@@ -13,9 +13,9 @@ import tkinter as tk
 import tkinter.ttk as ttk
 import tkinter.filedialog as fd
 from tkinter import messagebox
-from tkinter.ttk import Notebook
 
 from servo_popups import *
+from settings_popup import *
 
 
 # Needed to embed matplotlib in tkinter
@@ -56,7 +56,7 @@ class MainApp():
         self.main.config(menu=menubar)
         
         # ----- Notebook/tab configuration -----    
-        notebook = Notebook(self.main, width=self.main.winfo_width(),
+        notebook = ttk.Notebook(self.main, width=self.main.winfo_width(),
             height=self.main.winfo_height())
         
         # Initial tab -----
@@ -240,15 +240,7 @@ class SettingsPage(ttk.Frame):
                         page.plot.update()
                         page.parent.parent_notebook.tab(index+1, text=page.name)
             else:
-                #~ # Generate tabs/plots from inputs
-                #~ for i in range(self.num_of_servos.get()):
-                    #~ tab_name = 'Servo{}'.format(i+1)
-                    #~ tab = 'self.{}_tab'.format(tab_name)
-                    #~ tab = PlotPage(self, tab_name)
-                    #~ self.parent_notebook.add(tab, text=tab_name)
-                    #~ SettingsPage.plot_pages.append(tab)
-            
-                # Generate tabs/plots from inputs
+                # Generate tabs/plots from inputs on Settings Page
                 for i in range(self.num_of_servos.get()):
                     tab_title = 'Servo{}'.format(i+1)
                     tab_name = tab_title + '_tab'
@@ -459,12 +451,10 @@ class PlotPage(ttk.Frame):
             textvariable=self.pin_num)
        
         button_frame = ttk.Frame(self, padding=10) 
-        rename_button = ttk.Button(button_frame, text='Change servo name',
-            command=lambda: NamePopup(self))
-        change_limits_button = ttk.Button(button_frame, text='Change limits',
-            command = lambda: LimitPopup(self.plot))
-        time_adjust_button = ttk.Button(button_frame, text='Adjust Length',
-            command = lambda: TimeAdjustPopup(self.plot))
+            
+        self.settings_button = ttk.Button(button_frame, text='Settings',
+            command=self.settingsDisplay)
+            
         
         # Grid widgets into tab
         canvas.get_tk_widget().grid(columnspan=3)
@@ -475,10 +465,15 @@ class PlotPage(ttk.Frame):
         self.pin_entry.grid(row=0, column=1)
         
         button_frame.grid(row=2, column=2, sticky=tk.E)
-        change_limits_button.pack(padx=5, pady=5, side=tk.RIGHT)
-        time_adjust_button.pack(padx=5, side=tk.RIGHT)
-        rename_button.pack(padx=5, side=tk.RIGHT)
+        
+        self.settings_button.pack(padx=5, side=tk.RIGHT)
 
+    def settingsDisplay(self):
+        popup = SettingsPopup()
+        
+        popup.addTab(NamePage(self, popup), 'Change Title')
+        popup.addTab(TimeAdjustPage(self, popup), 'Adjust Time')
+        popup.addTab(LimitPage(self.plot, popup), 'Adjust Limits')
 
 class Plot():
     '''
@@ -555,9 +550,8 @@ class Plot():
         self.ax.set_xlim([pos-.5, pos+x_window+.5])
         self.ax.set_xticks([i for i in range(pos, pos+x_window+1)])
         self.ax.set_xticklabels([i/2 for i in self.ax.get_xticks()])
-        if self.length > 201:
-            for tick in self.ax.get_xticklabels():
-                tick.set_rotation(45)
+        for tick in self.ax.get_xticklabels():
+            tick.set_rotation(45)
         
         #~ # Plot upper and lower limits
         self.upper, = self.ax.plot(self.xs, [self.upper_limit for i in self.xs],

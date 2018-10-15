@@ -137,9 +137,14 @@ void loop() {% if button != 'None' %}
   // Button press starts servo routine
   if ((digitalRead(BUTTON_PIN) == LOW))
   {
-    Serial.println(F("Routine Started"));
-    routine(SERVO_ARR, NUM_SERVOS, VALUES_ARRAY, INTERVAL, ARRAY_LENGTH);
-    Serial.println(F("Exiting routine"));
+    long now = millis();
+    while ((millis() - now) < 50){}  // 50 ms delay to debounce
+    if ((digitalRead(BUTTON_PIN) == LOW))
+    {
+      Serial.println(F("Routine Started"));
+      routine(SERVO_ARR, NUM_SERVOS, VALUES_ARRAY, INTERVAL, ARRAY_LENGTH);
+      Serial.println(F("Exiting routine"));
+    }
   }
 {% else %}{
   // Do something with routine function:
