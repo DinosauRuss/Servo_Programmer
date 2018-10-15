@@ -50,14 +50,14 @@ class MainApp():
         # ----- Meubar configuration -----
         menubar = tk.Menu(self.main)
         
-        file_menu = tk.Menu(menubar, tearoff=0)
-        file_menu.add_command(label='Quit', command=self.main.destroy)
+        self.file_menu = tk.Menu(menubar, tearoff=0)
+        self.file_menu.add_command(label='Quit', command=self.main.destroy)
         
-        about_menu = tk.Menu(self.main, tearoff=0)
-        about_menu.add_command(label='About', command=lambda: AboutPopup())
+        self.about_menu = tk.Menu(self.main, tearoff=0)
+        self.about_menu.add_command(label='About', command=lambda: AboutPopup())
         
-        menubar.add_cascade(label='File', menu=file_menu)
-        menubar.add_cascade(label='Help', menu=about_menu)
+        menubar.add_cascade(label='File', menu=self.file_menu)
+        menubar.add_cascade(label='Help', menu=self.about_menu)
         
         # Add menubar to main window
         self.main.config(menu=menubar)
@@ -284,7 +284,10 @@ class SettingsPage(ttk.Frame):
                 self.toggleButtonStates()
                 
         except serial.SerialException as e:
-            self.toggleRecording()
+            self.record_state = False
+            self.record_button['image'] = self.record_image
+            self.record_button['text'] = 'Record'
+            
             print(e)
             messagebox.showerror('Error', 'Cannot find Arduino')
         except Exception as e:
@@ -555,6 +558,8 @@ class PlotPage(ttk.Frame):
         self.settings_button.pack(padx=5, side=tk.RIGHT)
 
     def settingsDisplay(self):
+        '''Add settings tabs to empty settings popup'''
+        
         popup = SettingsPopup()
         
         popup.addTab(NamePage(self, popup), 'Change Title')

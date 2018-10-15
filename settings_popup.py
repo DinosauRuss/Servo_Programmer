@@ -6,8 +6,11 @@ from tkinter import ttk
 
 from servo_popups import Popup
 
+from pprint import pprint
+
 
 class SettingsPopup(Popup):
+    '''Generic popup with notebook to hold various settings pages'''
     
     def __init__(self):
         super().__init__(title='Settings')
@@ -19,7 +22,7 @@ class SettingsPopup(Popup):
     def buildPage(self):
         self.notebook.pack(anchor=tk.CENTER, fill=tk.BOTH)
         
-    def addTab(self, page, txt='cheese'):    
+    def addTab(self, page, txt='Tab'):    
         self.notebook.add(page, text=txt)
     
 
@@ -63,16 +66,18 @@ class NamePage(ttk.Frame):
         name = str(self.name_entry.get()).replace(' ', '')
         name = name[:10]    # Limit length of name
         
-        for tab in self.page.parent.plot_pages:
-            if name == tab.name:
+        for page in self.page.parent.plot_pages:
+            if name == page.name:
                 messagebox.showerror('Error!', 'Names must be unique')
-                self.destroy()
+                self.parent.destroy()
                 return
         if name:
-            self.page.parent.parent_notebook.tab(self.page.plot_num, text=name)
+            index = self.page.parent.plot_pages.index(self.page) + 1
+            self.page.parent.parent_notebook.tab(index, text=name)
             self.page.name = name
             self.page.plot.update()
             self.parent.destroy()    
+            
         else:
             self.parent.destroy()
             
@@ -207,7 +212,7 @@ class TimeAdjustPage(ttk.Frame):
                     messagebox.showerror('Limit Error', 'Total of all routines \
                     must be less than 6 minutes \
                     (360 seconds)')
-                    self.destroy()
+                    #~ self.destroy()
                     return
                 
                 temp_arr = [0 for i in range(self.time_entry_var.get() * 2)]
@@ -231,7 +236,7 @@ class TimeAdjustPage(ttk.Frame):
                 if nodes_to_remove >= (len(plot_page.plot.ys) - 1):
                     messagebox.showerror('Error',
                         'Removing too many seconds')
-                    self.destroy()
+                    #~ self.destroy()
                     return
                             
                 if self.where_var.get() == 'begin':
@@ -255,5 +260,56 @@ class TimeAdjustPage(ttk.Frame):
             
         self.parent.destroy()
         
+
+class DeletePage(ttk.Frame):
+    
+    def __init__(self, plot, parent):
+        super().__init__(parent)
+        
+        self.plot = plot
+        self.parent = parent
+        
+        self.buildPage()
+    
+    def buildPage(self):
+        main_frame = ttk.Frame(self)
+        button_frame = ttk.Frame(main_frame)
+        
+        title = ttk.Label(main_frame, text='Delete Tab?', font=(None, 14))
+        del_button = ttk.Button(button_frame, text='Delete',
+            command=self.deleteTab)
+        cancel_button = ttk.Button(button_frame, text='Cancel',
+            command=self.parent.destroy)
+    
+        title.pack()
+        button_frame.pack(pady=10)
+        del_button.grid(row=0, column=0, padx=5)
+        cancel_button.grid(row=0, column=1, padx=5)
+        
+        main_frame.pack(side=tk.TOP, pady=20)
+    
+    def deleteTab(self):
+        if self.plot.parent.parent.num_of_servos.get() > 1:
+            if messagebox.askokcancel('Delete Tab?',
+                'Are you sure you want to delet this tab?'):
+                
+                name = self.plot.parent.name + '_tab'
+                
+                self.plot.parent.parent.plot_pages.remove(self.plot.parent)
+                self.plot.parent.parent.parent_notebook.forget(self.plot.parent)
+                self.plot.parent.parent.num_of_servos.set(len(self.plot.parent.parent.plot_pages))
+                
+                self.plot.parent.__class__.total_pages -= 1
+                
+                self.parent.destroy()
+            else:
+                self.parent.destroy()
+            
+                
+        
+    
+    
+    
+    
 
 
