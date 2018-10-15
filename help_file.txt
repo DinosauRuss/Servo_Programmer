@@ -1,4 +1,21 @@
 
-TODO:
+Settings Page:
 
-create this help file
+Total routine length among all servos is limited to 360 seconds due to limitations of Arduino memory.
+
+Option to enter Arduino pin # to call/run the function and run the routine for all servos simultaneously.
+
+i2c PCA9686  module uses the AAdafruit_PWMServoDriver library for Arduino.
+Servos directly connected to Arduino pins use the standard Servo library.
+
+Output is a functional sketch for Arduino.
+
+Can save and load previous routines.
+
+
+
+Individual plot:
+
+Double-click node to directly enter value.
+
+If connecting servos directly to Arduino, enter Pin #. If connecting to PCA9685, enter servo number (0-15)
