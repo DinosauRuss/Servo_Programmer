@@ -13,9 +13,16 @@ Output is a functional sketch for Arduino.
 Can save and load previous routines.
 
 
-
 Individual plot:
 
 Double-click node to directly enter value.
 
 If connecting servos directly to Arduino, enter Pin #. If connecting to PCA9685, enter servo number (0-15)
+
+
+Settings Dialog:
+
+Plot names must be unique and no more than 10 characters.
+Can add or remove time from the beginning or end of the plot.
+By default the servo range of motion is 0-179 degrees, these limits can be adjusted.
+Can add or delete servos but there must be at least 1 and no more than 8.
