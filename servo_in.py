@@ -22,7 +22,6 @@ from tkinter import messagebox
 from servo_popups import *
 from settings_popup import *
 
-#~ from pprint import pprint
 
 # Needed to embed matplotlib in tkinter
 Use('TkAgg')
@@ -563,7 +562,8 @@ class PlotPage(ttk.Frame):
         popup = SettingsPopup()
         
         popup.addTab(NamePage(self, popup), 'Change Title')
-        popup.addTab(TimeAdjustPage(self, popup), 'Adjust Time')
+        popup.addTab(TimeAddPage(self, popup), 'Add Time')
+        popup.addTab(TimeDelPage(self, popup), 'Delete Time')
         popup.addTab(LimitPage(self.plot, popup), 'Adjust Limits')
     
 
