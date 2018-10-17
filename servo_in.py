@@ -142,7 +142,7 @@ class SettingsPage(ttk.Frame):
         
         self.btn_check_var.set(False)
         button_checkbox = ttk.Checkbutton(right,
-            text = 'Use button to Start Routine\n(Enter Button Number)',
+            text = 'Use button to Start Routine\n(Enter Pin Number)',
             variable=self.btn_check_var,
             command=self.toggleBtnCheckbox)
         button_checkbox.grid(sticky=tk.W)
