@@ -88,6 +88,9 @@ class SettingsPage(ttk.Frame):
     record_state = False
     prev_record = False
     
+    max_seconds = 360
+    max_servos = 8
+    
     def __init__(self, parent_notebook, parent):
         super().__init__()
         
@@ -113,14 +116,15 @@ class SettingsPage(ttk.Frame):
         l_title.grid(columnspan=5, pady=20)
                 
         seconds_label = ttk.Label(left, text='Routine length (in seconds)\
-            \n(1-360):', state='disabled')
+            \n(1-{}):'.format(SettingsPage.max_seconds), state='disabled')
         seconds_label.grid(padx=10, pady=15)
         
         self.seconds_entry = ttk.Entry(left, width=5, justify=tk.RIGHT,
             textvariable = self.num_of_seconds, state='disabled')
         self.seconds_entry.grid(padx=25, pady=15, row=1, column=1)
         
-        servo_total_label = ttk.Label(left, text='Number of servos (1-8)',
+        servo_total_label = ttk.Label(left,
+            text='Number of servos (1-{})'.format(SettingsPage.max_servos),
             state='disabled')
         servo_total_label.grid(padx=10, pady=15)
         
@@ -231,8 +235,8 @@ class SettingsPage(ttk.Frame):
         num_servos = len(new_tabs)
         ####
                 
-        if num_servos > 8:
-            messagebox.showerror('Error', '8 servos max')
+        if num_servos > SettingsPage.max_servos:
+            messagebox.showerror('Error', '{} servos max'.format(SettingsPage.max_servos))
             self.toggleRecording()
             return
         
@@ -300,11 +304,11 @@ class SettingsPage(ttk.Frame):
         for index, data_point in enumerate(newYs):
             plot = SettingsPage.plot_pages[index].plot
             
-            if (len(self.plot_pages) * ((len(plot.ys)-1)/2)) >= 360:
+            if (len(self.plot_pages) * ((len(plot.ys)-1)/2)) >= SettingsPage.max_seconds:
                 self.toggleRecording()
                 self.record_button['state'] = 'disabled'
                 messagebox.showinfo('Memory Full',
-                    'Total recording time limited to 360 seconds')
+                    'Total recording time limited to {} seconds'.format(SettingsPage.max_seconds))
                 break
             
             plot.ys.append(int(data_point))
