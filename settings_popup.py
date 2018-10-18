@@ -200,13 +200,17 @@ class TimeAddPage(ttk.Frame):
         
         for plot_page in self.page.parent.plot_pages:
                 
-            # Verify not going over 360 seconds total (Arduino memory limit)
+            # Verify not going over SettingsPage.max_seconds total (Arduino memory limit)
             temp_length = \
                 ((len(plot_page.plot.ys)-1)/2) + (seconds)
-            if temp_length * len(self.page.parent.plot_pages) > 360:
-                messagebox.showerror('Limit Error', 'Total of all routines \
-                must be less than 6 minutes \
-                (360 seconds)')
+                
+            if (temp_length * len(self.page.parent.plot_pages)) > \
+                self.page.parent.max_seconds:
+                    
+                messagebox.showerror('Limit Error', 'Total of all routines' +
+                    'must be less than 6 minutes ' + 
+                    '({} seconds)'.format(self.page.parent.max_seconds))
+                    
                 self.parent.destroy()
                 return
             
