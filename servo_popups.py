@@ -145,6 +145,77 @@ class HelpPopup(Popup):
                 return infile.read()
         except IOError:
             messagebox.showerror(title='File Load Error',
-                message='Unable to load file {} '.format(filename))       
+                message='Unable to load file {} '.format(filename))      
+                
+                
+class DevPopup(Popup):
+     
+    def __init__(self, settings_page):
+        super().__init__(title='Dev Page', geometry='250x100')
+         
+        self.settings_page = settings_page
+         
+        self.buildPage()
+         
+    def buildPage(self):
+        
+        self.new_seconds_var = tk.IntVar()
+        self.new_servos_var = tk.IntVar()
+        self.new_seconds_var.set(self.settings_page.__class__.max_seconds)
+        self.new_servos_var.set(self.settings_page.__class__.max_servos)
+        
+        main_frame = ttk.Frame(self, padding=5)
+        
+        seconds_label = ttk.Label(main_frame, text='Total runtime (seconds)')
+        seconds_entry = ttk.Entry(main_frame, textvariable=self.new_seconds_var,
+            width=6)
+        
+        servos_label = ttk.Label(main_frame, text='Total number of servos')
+        servos_entry = ttk.Entry(main_frame, textvariable=self.new_servos_var,
+            width=6)
+        
+        button_frame = ttk.Frame(main_frame)    
+        ok_button = ttk.Button(button_frame, text='OK', command=self.update)
+        cancel_button = ttk.Button(button_frame, text='Cancel',
+            command=self.destroy)
+        
+        main_frame.pack(fill=tk.BOTH, expand=1)
+        
+        seconds_label.grid(row=0, column=0)
+        seconds_entry.grid(row=0, column=1)
+        servos_label.grid(row=1, column=0)
+        servos_entry.grid(row=1, column=1)
+        
+        button_frame.grid(columnspan=2, pady=10)
+        ok_button.pack(side=tk.LEFT)
+        cancel_button.pack(side=tk.RIGHT)
+        
+    def update(self):
+        
+        current_total_servos = self.settings_page.num_of_servos.get()
+        current_total_seconds =\
+            self.settings_page.num_of_seconds.get() * current_total_servos
+        
+        if self.new_seconds_var.get() < current_total_seconds:
+            messagebox.showerror('Error', 'New max runtime is less than\n'\
+                + 'current routine runtime')
+            self.destroy()
+            return
+        if self.new_servos_var.get() < current_total_servos:
+            messagebox.showerror('Error', 'New max servos is less than\n'\
+                + 'current number of servos')
+            self.destroy()
+            return
+
+        self.settings_page.__class__.max_seconds = self.new_seconds_var.get()
+        self.settings_page.__class__.max_servos = self.new_servos_var.get()
+        
+        self.settings_page.seconds_label_var.set('Routine length (in seconds)\
+            \n(1-{}):'.format(self.settings_page.max_seconds))
+        self.settings_page.servo_label_var.set(\
+            'Number of servos (1-{})'.format(self.settings_page.max_servos))
+        
+        self.destroy()
+    
     
 

@@ -108,24 +108,36 @@ class SettingsPage(ttk.Frame):
         self.btn_check_var = tk.IntVar()
         self.output_type_var = tk.StringVar()   # Pin nums or i2c
         
+        # Used to update the labels when max seconds/servos changed
+        self.seconds_label_var = tk.StringVar()
+        self.servo_label_var = tk.StringVar()
+        
+        self.main_frame = ttk.Frame(self)
+        self.main_frame.pack(expand=1, fill=tk.BOTH)
+        
+        # Use Shift+d to change max seconds/servos
+        self.main_frame.bind("<Shift-D>", lambda event: DevPopup(self))
+        self.main_frame.bind("<Button-1>", lambda event: self.main_frame.focus_set())
+        
         # --- Left side Frame ---
-        left = ttk.Frame(self)
+        left = ttk.Frame(self.main_frame)
         left.pack(side=tk.LEFT, anchor=tk.N)
         
         l_title = ttk.Label(left, text='Settings', font=(None, 25))
         l_title.grid(columnspan=5, pady=20)
                 
-        seconds_label = ttk.Label(left, text='Routine length (in seconds)\
-            \n(1-{}):'.format(SettingsPage.max_seconds), state='disabled')
+        self.seconds_label_var.set('Routine length (in seconds)\
+            \n(1-{}):'.format(SettingsPage.max_seconds))
+        seconds_label = ttk.Label(left, textvariable=self.seconds_label_var)
         seconds_label.grid(padx=10, pady=15)
         
         self.seconds_entry = ttk.Entry(left, width=5, justify=tk.RIGHT,
             textvariable = self.num_of_seconds, state='disabled')
         self.seconds_entry.grid(padx=25, pady=15, row=1, column=1)
         
-        servo_total_label = ttk.Label(left,
-            text='Number of servos (1-{})'.format(SettingsPage.max_servos),
-            state='disabled')
+        self.servo_label_var.set(\
+            'Number of servos (1-{})'.format(SettingsPage.max_servos))
+        servo_total_label = ttk.Label(left, textvariable=self.servo_label_var)
         servo_total_label.grid(padx=10, pady=15)
         
         self.servo_total_entry = ttk.Entry(left, width=5, justify=tk.RIGHT,
@@ -138,7 +150,7 @@ class SettingsPage(ttk.Frame):
             rowspan=2)
         
         # --- Right side Frame ---
-        right = ttk.Frame(self)
+        right = ttk.Frame(self.main_frame)
         right.pack(anchor=tk.CENTER)
         
         r_title = ttk.Label(right, text='Output', font=(None, 25))
@@ -243,6 +255,9 @@ class SettingsPage(ttk.Frame):
         self.num_of_servos.set(num_servos)
         self.generatePlots(new_tabs)
         self.prev_record = True
+        
+        self.main_frame.unbind("<Shift-D>")
+        self.main_frame.unbind("<Button-1>")
                 
         # Let tkinter do what it needs
         self.parent.main.update_idletasks()
@@ -324,15 +339,9 @@ class SettingsPage(ttk.Frame):
     def toggleButtonStates(self):
         if self.record_state:
             for page in self.plot_pages:
-                #~ page.rename_button['state'] = 'disabled'
-                #~ page.change_limits_button['state'] = 'disabled'
-                #~ page.time_adjust_button['state'] = 'disabled'
                 page.settings_button['state'] = 'disabled'
         else:
             for page in self.plot_pages:
-                #~ page.rename_button['state'] = 'normal'
-                #~ page.change_limits_button['state'] = 'normal'
-                #~ page.time_adjust_button['state'] = 'normal'
                 page.settings_button['state'] = 'normal'
 
     def generatePlots(self, servos):
@@ -343,7 +352,7 @@ class SettingsPage(ttk.Frame):
 
         # Generate tabs/plots from Arduino info
         for i in servos:
-            tab_title = i
+            tab_title = i[:10]
             tab_name = tab_title + '_tab'
             setattr(self, tab_name, PlotPage(self, tab_title))
             self.parent_notebook.add(getattr(self, tab_name), text=tab_title)

@@ -214,7 +214,8 @@ class TimeAddPage(ttk.Frame):
                 self.parent.destroy()
                 return
             
-            temp_arr = [0 for i in range(seconds * 2)]
+            #~ temp_arr = [0 for i in range(seconds * 2)]
+            temp_arr = [self.page.parent.node_start_val for i in range(seconds * 2)]
             
             if self.where_var.get() == 'begin':
                 plot_page.plot.ys = temp_arr + plot_page.plot.ys
@@ -367,13 +368,12 @@ class ServoDeletePage(ttk.Frame):
                 self.plot.parent.parent.parent_notebook.forget(self.plot.parent)
                 self.plot.parent.parent.num_of_servos.set(len(self.plot.parent.parent.plot_pages))
                 
-                self.plot.parent.__class__.total_pages -= 1
-                
                 self.parent.destroy()
             else:
                 self.parent.destroy()
             
                 
+
         
     
 

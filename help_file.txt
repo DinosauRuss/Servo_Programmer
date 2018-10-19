@@ -3,6 +3,8 @@ Settings Page:
 
 Total routine length among all servos is limited to 360 seconds due to limitations of Arduino memory.
 
+Shift+d opens dialog to change total routine length and maximum number of servos
+
 Option to enter Arduino pin # to call/run the function and run the routine for all servos simultaneously.
 
 i2c PCA9686  module uses the AAdafruit_PWMServoDriver library for Arduino.
@@ -26,3 +28,5 @@ Plot names must be unique and no more than 10 characters.
 Can add or remove time from the beginning or end of the plot.
 By default the servo range of motion is 0-179 degrees, these limits can be adjusted.
 Can add or delete servos but there must be at least 1 and no more than 8.
+
+
