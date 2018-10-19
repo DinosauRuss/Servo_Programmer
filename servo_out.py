@@ -2,6 +2,7 @@
 import dill
 import jinja2
 import os
+import traceback
 
 from matplotlib import use as Use
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -57,6 +58,9 @@ class MainApp():
         self.edit_menu.add_command(label='Add Servo', 
             command=lambda: self.settings_tab.addServo(),
             state='disabled')
+        self.edit_menu.add_command(label='Import Servos',
+            command=lambda: self.settings_tab.loadData(),
+            state='disabled')
         self.edit_menu.add_command(label='Output Sketch',
             command=lambda: self.settings_tab.outputSketch(), 
             state='disabled')
@@ -93,7 +97,6 @@ class SettingsPage(ttk.Frame):
     
     max_seconds = 360
     max_servos = 8
-    
     node_start_val = 90
     
     def __init__(self, parent_notebook, parent):
@@ -101,6 +104,11 @@ class SettingsPage(ttk.Frame):
         
         self.parent_notebook = parent_notebook
         self.parent = parent
+        
+        #~ self.max_seconds = tk.IntVar()
+        #~ self.max_seconds.set(360)
+        #~ self.max_servos = tk.IntVar()
+        #~ self.max_servos.set(8)
 
         self.buildPage()
         
@@ -113,23 +121,36 @@ class SettingsPage(ttk.Frame):
         self.btn_check_var = tk.IntVar()
         self.output_type_var = tk.StringVar()   # Pin nums or i2c
         
+        # Used to update the labels when max seconds/servos changed
+        self.seconds_label_var = tk.StringVar()
+        self.servo_label_var = tk.StringVar()
+        
+        main_frame = ttk.Frame(self)
+        main_frame.pack(expand=1, fill=tk.BOTH)
+        
+        # Use Shift+d to change max seconds/servos
+        main_frame.bind("<Shift-D>", lambda event: DevPopup(self))
+        main_frame.bind("<Button-1>", lambda event: main_frame.focus_set())
+        
         # --- Left side Frame ---
-        left = ttk.Frame(self)
+        left = ttk.Frame(main_frame)
         left.pack(side=tk.LEFT, anchor=tk.N)
         
         l_title = ttk.Label(left, text='Settings', font=(None, 25))
         l_title.grid(columnspan=5, pady=20)
-                
-        seconds_label = ttk.Label(left, text='Routine length (in seconds)\
+        
+        self.seconds_label_var.set('Routine length (in seconds)\
             \n(1-{}):'.format(SettingsPage.max_seconds))
+        seconds_label = ttk.Label(left, textvariable=self.seconds_label_var)
         seconds_label.grid(padx=10, pady=15)
         
         self.seconds_entry = ttk.Entry(left, width=5, justify=tk.RIGHT,
             textvariable = self.num_of_seconds)
         self.seconds_entry.grid(padx=25, pady=15, row=1, column=1)
         
-        servo_total_label = ttk.Label(left,
-            text='Number of servos (1-{})'.format(SettingsPage.max_servos))
+        self.servo_label_var.set(\
+            'Number of servos (1-{})'.format(SettingsPage.max_servos))
+        servo_total_label = ttk.Label(left, textvariable=self.servo_label_var)
         servo_total_label.grid(padx=10, pady=15)
         
         self.servo_total_entry = ttk.Entry(left, width=5, justify=tk.RIGHT,
@@ -146,7 +167,7 @@ class SettingsPage(ttk.Frame):
         self.add_servo_button.grid(pady=50)
         
         # --- Right side Frame ---
-        right = ttk.Frame(self)
+        right = ttk.Frame(main_frame)
         right.pack(anchor=tk.CENTER)
         
         r_title = ttk.Label(right, text='Output', font=(None, 25))
@@ -205,98 +226,13 @@ class SettingsPage(ttk.Frame):
         self.num_of_servos.set(0)
         self.button_entry_val.set('None')
     
-    #~ def generatePlots(self):
-        #~ '''
-        #~ Generate specified number of Plot tabs each containing a plot
-        #~ of the specified routine length
-        #~ '''
-        
-        #~ if self.load_flag:
-            #~ # Use attribute 'settings' from self.loadData
-            
-            #~ # Fill entry boxes with values
-            #~ if self.settings['button_#'] == 'None':
-                #~ self.btn_check_var.set(False)
-            #~ else:
-                #~ self.btn_check_var.set(True)
-                #~ self.button_entry_val.set(self.settings['button_#'])
-            #~ if self.settings['output_type'] == 'i2c':
-                #~ self.i2c.invoke()
-            #~ else:
-                #~ self.pins.invoke()
-            #~ self.toggle_btn_checkbox()
-            #~ self.num_of_seconds.set(self.settings['seconds'])
-            #~ self.num_of_servos.set(len(self.settings['plot_pages']))
-            
-            #~ # Generate tabs/plots using loaded data
-            #~ for page in self.settings['plot_pages']:
-                #~ plot_title = page[0]
-                #~ tab_name = plot_title + '_tab'
-                #~ plotPage = PlotPage(self, plot_title)
-                
-                #~ self.parent_notebook.add(plotPage, text=plot_title)
-                #~ SettingsPage.plot_pages.append(plotPage)
-                
-                #~ plotPage.pin_num.set(page[1])
-                #~ plotPage.plot.ys = page[2]
-                #~ plotPage.plot.update()
-                    
-        #~ else:
-            #~ # Generate tabs/plots from inputs on Settings Page
-            #~ try: 
-                #~ # Check inputs for errors
-                #~ limit = lambda n, n_min, n_max: max(min(n, n_max), n_min)
-                
-                #~ # Routine between 1 and (SettingsPage.max_seconds)
-                #~ temp_secs= self.num_of_seconds.get()
-                #~ self.num_of_seconds.set(limit(temp_secs, 1, SettingsPage.max_seconds))
-                
-                #~ # Maximum of SettingsPage.max_servos
-                #~ temp_servos = self.num_of_servos.get()
-                #~ self.num_of_servos.set(limit(temp_servos, 1, SettingsPage.max_servos))
-                
-                #~ if (self.num_of_servos.get() * \
-                        #~ self.num_of_seconds.get()) > SettingsPage.max_seconds:
-                    #~ self.resetEntries()
-                    #~ messagebox.showerror('Limit Error', 'Total of all routines \
-                        #~ must be less than 6 minutes \
-                        #~ ({} seconds)'.format(SettingsPage.max_seconds))
-                    #~ return
-        
-            #~ except Exception as e:
-                #~ print(e)
-                #~ messagebox.showerror(title='Error!', message='Inputs must be numbers')
-                #~ self.resetEntries()
-            
-            #~ else:
-                #~ for i in range(self.num_of_servos.get()):
-                    #~ plot_title = 'Servo{}'.format(i+1)
-                    #~ tab_name = plot_title + '_tab'
-                    #~ plotPage = PlotPage(self, plot_title)
-                    
-                    #~ self.parent_notebook.add(plotPage, text=plot_title)
-                    #~ SettingsPage.plot_pages.append(plotPage)
-        
-        #~ # Change button states after loading or generating new plots
-        #~ self.generate_plots_button['state']='disabled'
-        #~ self.seconds_entry['state']='disabled'
-        #~ self.servo_total_entry['state']='disabled'
-        #~ self.add_servo_button['state'] = 'normal'
-        
-        #~ self.save_button['state'] = 'normal'
-        #~ self.load_button['state'] = 'disabled'
-        #~ self.output_button['state'] = 'normal'
-        
-        #~ # Change main menubar states
-        #~ self.parent.file_menu.entryconfig(0, state='normal')
-        #~ self.parent.file_menu.entryconfig(1, state='disabled')
-        #~ self.parent.edit_menu.entryconfig(0, state='normal')
-        #~ self.parent.edit_menu.entryconfig(1, state='normal')
     def generatePlots(self):
         '''
         Generate specified number of Plot tabs each containing a plot
         of the specified routine length
         '''
+        
+        SettingsPage.initial_load_flag = True
         
         if SettingsPage.load_flag:
             self.loadServos()
@@ -307,7 +243,7 @@ class SettingsPage(ttk.Frame):
                 # Check inputs for errors
                 limit = lambda n, n_min, n_max: max(min(n, n_max), n_min)
                 
-                # Routine between 1 and (SettingsPage.max_seconds)
+                # Routine between 1 and (self.max_seconds)
                 temp_secs= self.num_of_seconds.get()
                 self.num_of_seconds.set(limit(temp_secs, 1, SettingsPage.max_seconds))
                 
@@ -319,14 +255,16 @@ class SettingsPage(ttk.Frame):
                         self.num_of_seconds.get()) > SettingsPage.max_seconds:
                     self.resetEntries()
                     messagebox.showerror('Limit Error', 'Total of all routines \
-                        must be less than 6 minutes \
+                        must be less than \
                         ({} seconds)'.format(SettingsPage.max_seconds))
                     return
         
             except Exception as e:
                 print(e)
+                print(traceback.format_exc())
                 messagebox.showerror(title='Error!', message='Inputs must be numbers')
                 self.resetEntries()
+                return
             
             else:
                 for i in range(self.num_of_servos.get()):
@@ -344,7 +282,7 @@ class SettingsPage(ttk.Frame):
         self.add_servo_button['state'] = 'normal'
         
         self.save_button['state'] = 'normal'
-        #~ self.load_button['state'] = 'disabled'
+        self.load_button['state'] = 'disabled'
         self.output_button['state'] = 'normal'
         
         # Change main menubar states
@@ -352,6 +290,7 @@ class SettingsPage(ttk.Frame):
         self.parent.file_menu.entryconfig(1, state='disabled')
         self.parent.edit_menu.entryconfig(0, state='normal')
         self.parent.edit_menu.entryconfig(1, state='normal')
+        self.parent.edit_menu.entryconfig(2, state='normal')
     
     def addServo(self):
         '''Add additional no-data servo'''
@@ -368,7 +307,8 @@ class SettingsPage(ttk.Frame):
                 + ' seconds\n\nCannot add servo')
             return
             
-        plot_title = 'New_Servo{}'.format(num + 1)
+        #~ plot_title = 'New_Servo{}'.format(self.num + 1)
+        plot_title = 'New_Servo{}'.format(PlotPage.total_pages)
         tab_name = plot_title + '_tab'
         plotPage = PlotPage(self, plot_title)
         
@@ -376,17 +316,10 @@ class SettingsPage(ttk.Frame):
         SettingsPage.plot_pages.append(plotPage)
         
         self.num_of_servos.set(num + 1)
-        PlotPage.total_pages += 1    
     
     def loadServos(self):
         '''Add additional servo(s) with previously recorded data'''
         
-        #~ TODO
-        #~ #
-        #~ append ys as necessary
-        #~ reset num seconds
-            
-            
         # Use attribute 'settings' from self.loadData
         if not SettingsPage.initial_load_flag:
             # If initial load has not happened yet,
@@ -401,11 +334,10 @@ class SettingsPage(ttk.Frame):
             else:
                 self.pins.invoke()
             self.toggle_btn_checkbox()
-            self.num_of_seconds.set(self.settings['seconds'])
+            #~ self.num_of_seconds.set(self.settings['seconds'])
+        self.num_of_seconds.set(self.settings['seconds'])
             
-            SettingsPage.initial_load_flag = True
         
-            
         # Generate tabs/plots using loaded data
         
         # Prevent overloading max number of servos
@@ -458,7 +390,6 @@ class SettingsPage(ttk.Frame):
                 messagebox.showerror('Error', 'Loading too many seconds')
                 return
         
-        
         for page in self.settings['plot_pages']:
             plot_title = page[0]
             tab_name = plot_title + '_tab'
@@ -503,7 +434,7 @@ class SettingsPage(ttk.Frame):
         # Names potentially repeated when loading add'l saved servo data
         names = [page.name for page in self.plot_pages]
         if ( len(names) != len(set(names)) ):
-            messagebox.showerror('Error', 'Please correct repeated servo names')
+            messagebox.showerror('Error', 'Repeated servo names')
             return
         
         # Temporary data needed for template output
@@ -732,7 +663,8 @@ class Plot():
         self.ax = self.fig.add_subplot(111)
         
         self.xs = [i for i in range(self.length)]
-        self.ys = [self.lower_limit for i in self.xs]
+        #~ self.ys = [self.lower_limit for i in self.xs]
+        self.ys = [self.parent.parent.node_start_val for i in self.xs]
         
         self.setPlot()
         self.drawPlot()
