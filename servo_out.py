@@ -7,7 +7,10 @@ import traceback
 from matplotlib import use as Use
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
+from matplotlib.patches import Rectangle
+from matplotlib.widgets import SpanSelector
 
+from math import ceil
 from time import sleep
 
 import tkinter as tk
@@ -105,11 +108,6 @@ class SettingsPage(ttk.Frame):
         self.parent_notebook = parent_notebook
         self.parent = parent
         
-        #~ self.max_seconds = tk.IntVar()
-        #~ self.max_seconds.set(360)
-        #~ self.max_servos = tk.IntVar()
-        #~ self.max_servos.set(8)
-
         self.buildPage()
         
     def buildPage(self):
@@ -222,7 +220,7 @@ class SettingsPage(ttk.Frame):
     def resetEntries(self):
         '''Clear the entry widgets'''
         
-        self.num_of_seconds.set(0)
+        self.num_of_seconds.set(10)
         self.num_of_servos.set(0)
         self.button_entry_val.set('None')
     
@@ -581,10 +579,14 @@ class PlotPage(ttk.Frame):
         self.pin_num = tk.IntVar()
         
         # To scroll along the plot
+        # Needs to be created before Plot
         # Upper limit is seconds minus half the length of the plot 'x_window'
         self.slider = ttk.Scale(self, orient=tk.HORIZONTAL,
             to=self.parent.num_of_seconds.get()-10,
             length=self.parent.parent_notebook.winfo_width())
+        
+        
+        # ----- Matplotlib Plot -----
         
         # Plot instance, bound to tab instance
         self.plot = Plot(self, self.parent.num_of_seconds.get(), self.slider,
@@ -593,9 +595,18 @@ class PlotPage(ttk.Frame):
         # Drawing area for the graph
         canvas = FigureCanvasTkAgg(self.plot.fig, master=self)
         # Bind mouse events to canvas to change data
-        canvas.mpl_connect('pick_event', self.plot.onPress)
+        canvas.mpl_connect('pick_event', self.plot.onNodeClick)
         canvas.mpl_connect('button_release_event', self.plot.onRelease)
         canvas.mpl_connect('motion_notify_event', self.plot.onMotion)
+        
+        canvas.mpl_connect('button_press_event', self.plot.onClick)
+        canvas.mpl_connect('motion_notify_event', self.plot.onMotion)
+        
+        # Need to create SpanSelector widget after canvas is created
+        self.plot.span = self.plot.createSpanSelector()
+        
+        # ----- End of Matplotlib plot -----
+        
         
         pin_assign_frame = ttk.Frame(self, padding=10)
         pin_label = ttk.Label(pin_assign_frame, text='Pin # or address: ')
@@ -649,7 +660,7 @@ class Plot():
         self.num = num                 # Which number servo, for plot title
         self.length = (seconds*2)+1    # Number of nodes in plot, 2 per second
         
-        self.click = False             # Node follows mouse only when clicked
+        self.node_clicked = False       # Node follows mouse only when clicked
         self.point_index = None        # Track which node has been selected
         
         # For keeping values within range of servo degrees
@@ -663,8 +674,12 @@ class Plot():
         self.ax = self.fig.add_subplot(111)
         
         self.xs = [i for i in range(self.length)]
-        #~ self.ys = [self.lower_limit for i in self.xs]
         self.ys = [self.parent.parent.node_start_val for i in self.xs]
+        
+        # To hold values from span selector
+        self.span_xs = []
+        self.span_ys = []
+        
         
         self.setPlot()
         self.drawPlot()
@@ -726,8 +741,15 @@ class Plot():
         # Clickable nodes
         self.nodes, = self.ax.plot(self.xs, self.ys, 'k.', 
             markersize=10, picker=5.0)
-        
-    def onPress(self, event):
+   
+    def createSpanSelector(self):
+        '''Creates span selector widget'''
+    
+        return SpanSelector(self.ax, self.spanSelect, 'horizontal',
+                    useblit=True, span_stays=False, button=1, minspan=.05,
+                    rectprops=dict(alpha=0.25, facecolor='green'))
+    
+    def onNodeClick(self, event):
         '''Which node has been clicked'''
         
         point = event.artist
@@ -736,27 +758,94 @@ class Plot():
         self.point_index = int(index[0])
         
         if not event.mouseevent.dblclick:
-            self.click = True
+            self.node_clicked = True
         
         else:
             # If node is double-clicked open popup to change value
             sleep(.1)  # Needs short delay to end all events on mainloop
             ValuePopup(self, self.point_index)
+    
+    def spanSelect(self, x_min, x_max):
+        '''Callback for span selector'''
+        
+        limit = lambda n, n_min, n_max: max(min(n, n_max), n_min)
+        
+        xmin = limit(ceil(x_min), 0, len(self.xs))
+        xmax = limit(ceil(x_max), 0, len(self.xs))
+        
+        selected_xs = self.xs[xmin:xmax]
+        selected_ys = self.ys[xmin:xmax]
+        
+        if len(selected_xs) <= 1:
+            self.span_xs = []
+            self.span_ys = []
+            return
+        
+        # Store selected points into lists
+        self.span_xs = selected_xs
+        self.span_ys = selected_ys
+        
+        # Create rectangle that remains, hightlighting selection
+        self.highlight_rect = Rectangle((x_min, -10), width=(x_max-x_min),
+            height=200, angle=0, **dict(alpha=0.5, facecolor='lightskyblue'))
+        self.ax.add_patch(self.highlight_rect)
+        
+        for xp, yp in zip(self.span_xs, self.span_ys):
+            print(xp, yp, sep=',')
+        print()
+            
+    def onClick(self, event):
+        '''Right click makes span select go away,
+           resets selection arrays'''
+        
+        # If moving a node, deactivate spanselector
+        if event.button == 1 and self.node_clicked:
+            self.span.active= False
+            
+            # Del highlight rect if selected node is not highlighted
+            if self.point_index not in self.span_xs:
+                if hasattr(self, 'highlight_rect'):
+                    self.highlight_rect.remove()
+                    delattr(self, 'highlight_rect')
+        
+        if event.button == 3:            
+            self.span_xs = []
+            self.span_ys = []
+            
+            # Clear previous highlight rect
+            if hasattr(self, 'highlight_rect'):
+                self.highlight_rect.remove()
+                delattr(self, 'highlight_rect')
+            
+            self.update()
         
     def onMotion(self, event):
-        if self.click and event.inaxes:
+        '''Mouse can drag nodes'''
+        
+        if self.node_clicked and event.inaxes:
             # Point follows mouse on y-axis
             self.ys[self.point_index] = self.limit_range(event.ydata)
             # Round to nearest whole degree
             self.ys[self.point_index] = int(round(self.ys[self.point_index]))
             
             self.update()
+            
+        # Clear previous highlight rect only if not moving a node
+        if not self.node_clicked and event.button == 1:
+            if hasattr(self, 'highlight_rect'):
+                self.highlight_rect.remove()
+                delattr(self, 'highlight_rect')
+
     
     def onRelease(self, event):
+        # Spanselector deactivates on certain mouse events,
+        # Any button release reactivates it
+        self.span.active = True
+        
         if self.point_index is not None:
-            self.click = False
+            self.node_clicked = False
             self.point_index = None
-    
+        
     def update(self):
         '''Re-draw plot after moving a point'''
 
