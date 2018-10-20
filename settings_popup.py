@@ -158,7 +158,8 @@ class TimeAddPage(ttk.Frame):
         
         main_frame = ttk.Frame(self, padding=5)
         
-        title = ttk.Label(main_frame, text='Add Time', font=(None, 14))
+        title = ttk.Label(main_frame, text='Add Time To All Plots',
+            font=(None, 14))
         
         entry_frame = ttk.Frame(main_frame)
         time_label = ttk.Label(entry_frame, text='Seconds   ')
@@ -256,7 +257,8 @@ class TimeDelPage(ttk.Frame):
         
         main_frame = ttk.Frame(self, padding=5)
         
-        title = ttk.Label(main_frame, text='Delete Time', font=(None, 14))
+        title = ttk.Label(main_frame, text='Delete Time From All Plots',
+            font=(None, 14))
         
         entry_frame = ttk.Frame(main_frame)
         time_label = ttk.Label(entry_frame, text='Seconds   ')
@@ -301,7 +303,6 @@ class TimeDelPage(ttk.Frame):
             nodes_to_remove = self.time_entry_var.get() * 2
             
             # Verify plot will still exist
-            #~ if nodes_to_remove >= plot_page.plot.length:
             if nodes_to_remove >= (len(plot_page.plot.ys) - 1):
                 messagebox.showerror('Error',
                     'Removing too many seconds')
