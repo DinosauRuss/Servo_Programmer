@@ -589,8 +589,9 @@ class PlotPage(ttk.Frame):
         # ----- Matplotlib Plot -----
         
         # Plot instance, bound to tab instance
-        self.plot = Plot(self, self.parent.num_of_seconds.get(), self.slider,
-            self.plot_num)
+        #~ self.plot = Plot(self, self.parent.num_of_seconds.get(), self.slider,
+            #~ self.plot_num)
+        self.plot = Plot(self, self.parent.num_of_seconds.get(), self.plot_num)
         
         # Drawing area for the graph
         canvas = FigureCanvasTkAgg(self.plot.fig, master=self)
@@ -651,9 +652,9 @@ class Plot():
     animating the interactive plot, is a child of a PlotPage object
     '''
     
-    def __init__(self, parent, seconds, scale, num):
+    def __init__(self, parent, seconds, num):
         self.parent = parent
-        self.scale = scale
+        self.scale = self.parent.slider
         self.scale['command'] = self.updatePos
         
         self.scale_pos = 0
@@ -679,6 +680,7 @@ class Plot():
         # To hold values from span selector
         self.span_xs = []
         self.span_ys = []
+        self.selection = False
         
         
         self.setPlot()
@@ -747,7 +749,7 @@ class Plot():
     
         return SpanSelector(self.ax, self.spanSelect, 'horizontal',
                     useblit=True, span_stays=False, button=1, minspan=.05,
-                    rectprops=dict(alpha=0.25, facecolor='green'))
+                    rectprops=dict(alpha=0.50, facecolor='lightskyblue'))
     
     def onNodeClick(self, event):
         '''Which node has been clicked'''
@@ -757,13 +759,34 @@ class Plot():
         
         self.point_index = int(index[0])
         
+        # Single-click
         if not event.mouseevent.dblclick:
             self.node_clicked = True
         
+        # Double-click
         else:
+            self.span.active = False
             # If node is double-clicked open popup to change value
-            sleep(.1)  # Needs short delay to end all events on mainloop
-            ValuePopup(self, self.point_index)
+            sleep(.1)  # Needs short delay
+
+            current_val = self.ys[self.point_index]
+            new_val, ok_cancel = ValuePopup(current_val).show()
+            
+            # If 'ok' button closed ValuePopup
+            if ok_cancel:
+                # Update app points in highlight to value from ValuePopup
+                if self.selection:
+                    for index, yp in enumerate(self.span_ys):
+                        self.span_ys[index] = new_val
+                     
+                    for xp in self.span_xs:
+                        selected_index = self.xs.index(xp)
+                        self.ys[selected_index] = new_val
+                        
+                else:
+                    self.ys[self.point_index] = new_val
+            
+            self.update()
     
     def spanSelect(self, x_min, x_max):
         '''Callback for span selector'''
@@ -787,37 +810,33 @@ class Plot():
         
         # Create rectangle that remains, hightlighting selection
         self.highlight_rect = Rectangle((x_min, -10), width=(x_max-x_min),
-            height=200, angle=0, **dict(alpha=0.5, facecolor='lightskyblue'))
+            height=200, angle=0, **dict(alpha=0.35, facecolor='lightskyblue'))
         self.ax.add_patch(self.highlight_rect)
+        self.selection = True
         
         for xp, yp in zip(self.span_xs, self.span_ys):
             print(xp, yp, sep=',')
         print()
             
     def onClick(self, event):
-        '''Right click makes span select go away,
+        '''Mouse click makes span select go away,
            resets selection arrays'''
         
-        # If moving a node, deactivate spanselector
-        if event.button == 1 and self.node_clicked:
-            self.span.active= False
-            
-            # Del highlight rect if selected node is not highlighted
-            if self.point_index not in self.span_xs:
-                if hasattr(self, 'highlight_rect'):
-                    self.highlight_rect.remove()
-                    delattr(self, 'highlight_rect')
-        
-        if event.button == 3:            
-            self.span_xs = []
-            self.span_ys = []
-            
-            # Clear previous highlight rect
-            if hasattr(self, 'highlight_rect'):
-                self.highlight_rect.remove()
-                delattr(self, 'highlight_rect')
-            
-            self.update()
+        if event.button == 1:
+            # If moving a node, deactivate spanselector
+            if self.node_clicked:
+                self.span.active= False
+                
+                # Del highlight rect if selected node is not highlighted
+                if self.point_index not in self.span_xs:
+                    self.removeHighlight()
+                
+            # Del selection rect when anything non-node is clicked    
+            elif not self.node_clicked:
+                self.removeHighlight()
+                
+        elif event.button == 3:
+            self.removeHighlight()
         
     def onMotion(self, event):
         '''Mouse can drag nodes'''
@@ -828,14 +847,12 @@ class Plot():
             # Round to nearest whole degree
             self.ys[self.point_index] = int(round(self.ys[self.point_index]))
             
-            self.update()
+            # Update highlighted point lists
+            if self.selection:
+                selected_index = self.span_xs.index(self.point_index)
+                self.span_ys[selected_index] = self.ys[self.point_index]
             
-        # Clear previous highlight rect only if not moving a node
-        if not self.node_clicked and event.button == 1:
-            if hasattr(self, 'highlight_rect'):
-                self.highlight_rect.remove()
-                delattr(self, 'highlight_rect')
-
+            self.update()
     
     def onRelease(self, event):
         # Spanselector deactivates on certain mouse events,
@@ -854,7 +871,20 @@ class Plot():
         self.drawPlot()
         self.fig.canvas.draw()
         
-
+    def removeHighlight(self):
+        #~ if hasattr(self, 'highlight_rect'):
+        if self.selection:
+            self.highlight_rect.remove()
+            delattr(self, 'highlight_rect')
+            
+            self.span_xs = []
+            self.span_ys = []
+            self.selection = False
+            
+            self.update()
+    
+    
+    
 
 WIDTH = 1000
 HEIGHT = 600

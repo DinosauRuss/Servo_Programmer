@@ -4,6 +4,8 @@ import tkinter as tk
 from tkinter import messagebox
 from tkinter import ttk
 
+import traceback
+
 
 class Popup(tk.Toplevel):
     '''Generic top level pop-up window'''
@@ -54,26 +56,72 @@ class AboutPopup(Popup):
         button_frame.pack(side=tk.BOTTOM, pady=10)
 
 
-class ValuePopup(Popup):
-    '''Change value of individual node'''
+#~ class ValuePopup(Popup):
+    #~ '''Change value of individual node'''
     
-    def __init__(self, plot, node_index, title='Change Value', geometry='240x125'):
+    #~ def __init__(self, plot, node_index, title='Change Value', geometry='240x125'):
+        #~ super().__init__(title, geometry)
+        
+        #~ self.plot = plot
+        #~ self.index = node_index
+        
+        #~ self.buildPage()
+        
+    #~ def buildPage(self):
+        #~ self.entry_value = tk.IntVar()
+        #~ self.entry_value.set(self.plot.ys[self.index])
+        
+        #~ main_frame = ttk.Frame(self, padding=5)
+        
+        #~ label = ttk.Label(main_frame, text='Enter a new value', font=(None, 12))
+        #~ self.new_val_entry = ttk.Entry(main_frame, width=6,
+            #~ textvariable=self.entry_value)
+        #~ self.new_val_entry.focus()
+        #~ self.new_val_entry.bind('<Return>', self.update)
+        
+        #~ ok_button = ttk.Button(main_frame, text='OK', command=self.update)
+        #~ cancel_button = ttk.Button(main_frame, text='Cancel',
+            #~ command=self.destroy)
+    
+        #~ main_frame.pack(fill=tk.BOTH, expand=1)
+        
+        #~ label.pack(padx=5, pady=5)
+        #~ self.new_val_entry.pack(pady=5)
+        #~ ok_button.pack(pady=5, side=tk.LEFT)
+        #~ cancel_button.pack(pady=5, side=tk.RIGHT)
+            
+    #~ def update(self, event=None):
+        
+        #~ try:
+            #~ self.plot.ys[self.index] = self.plot.limit_range(self.entry_value.get())
+            #~ self.plot.update()
+            
+        #~ except Exception as e:
+            #~ print('VAL ERROR: ', e)
+        
+        #~ finally:
+            #~ self.destroy()
+class ValuePopup(Popup):
+    '''Returns new value for a node,
+       and ok(True) or cancel(False) button press'''
+    
+    def __init__(self, current_value, title='Change Value', geometry='240x125'):
         super().__init__(title, geometry)
         
-        self.plot = plot
-        self.index = node_index
+        self.current_value = current_value
+        self.send_val = False
         
         self.buildPage()
         
     def buildPage(self):
         self.entry_value = tk.IntVar()
+        self.entry_value.set(self.current_value)
         
         main_frame = ttk.Frame(self, padding=5)
         
         label = ttk.Label(main_frame, text='Enter a new value', font=(None, 12))
         self.new_val_entry = ttk.Entry(main_frame, width=6,
             textvariable=self.entry_value)
-        self.entry_value.set(self.plot.ys[self.index])
         self.new_val_entry.focus()
         self.new_val_entry.bind('<Return>', self.update)
         
@@ -89,17 +137,23 @@ class ValuePopup(Popup):
         cancel_button.pack(pady=5, side=tk.RIGHT)
             
     def update(self, event=None):
-        
         try:
-            new_value = int(self.entry_value.get())
-            self.plot.ys[self.index] = self.plot.limit_range(new_value)
-            self.plot.update()
-            
+            self.entry_value.get()
         except Exception as e:
             print('VAL ERROR: ', e)
-        
+            traceback.print_exc()
+        else:
+            self.send_val = True
         finally:
             self.destroy()
+            
+    def show(self):
+        self.wait_window()
+        
+        if self.send_val:
+            return (self.entry_value.get(), True)
+        else:
+            return (self.current_value, False)
 
         
 class HelpPopup(Popup):
