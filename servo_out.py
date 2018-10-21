@@ -589,8 +589,6 @@ class PlotPage(ttk.Frame):
         # ----- Matplotlib Plot -----
         
         # Plot instance, bound to tab instance
-        #~ self.plot = Plot(self, self.parent.num_of_seconds.get(), self.slider,
-            #~ self.plot_num)
         self.plot = Plot(self, self.parent.num_of_seconds.get(), self.plot_num)
         
         # Drawing area for the graph
@@ -679,7 +677,7 @@ class Plot():
         
         # To hold values from span selector
         self.span_xs = []
-        self.span_ys = []
+        #~ self.span_ys = []
         self.selection = False
         
         
@@ -754,7 +752,7 @@ class Plot():
     def onNodeClick(self, event):
         '''Which node has been clicked'''
         
-        point = event.artist
+        #~ point = event.artist
         index = event.ind
         
         self.point_index = int(index[0])
@@ -762,7 +760,7 @@ class Plot():
         # Single-click
         if not event.mouseevent.dblclick:
             self.node_clicked = True
-        
+            
         # Double-click
         else:
             self.span.active = False
@@ -772,21 +770,17 @@ class Plot():
             current_val = self.ys[self.point_index]
             new_val, ok_cancel = ValuePopup(current_val).show()
             
-            # If 'ok' button closed ValuePopup
+            # If 'ok button' closed ValuePopup
             if ok_cancel:
                 # Update app points in highlight to value from ValuePopup
                 if self.selection:
-                    for index, yp in enumerate(self.span_ys):
-                        self.span_ys[index] = new_val
-                     
                     for xp in self.span_xs:
                         selected_index = self.xs.index(xp)
                         self.ys[selected_index] = new_val
-                        
                 else:
                     self.ys[self.point_index] = new_val
             
-            self.update()
+                self.update()
     
     def spanSelect(self, x_min, x_max):
         '''Callback for span selector'''
@@ -801,22 +795,18 @@ class Plot():
         
         if len(selected_xs) <= 1:
             self.span_xs = []
-            self.span_ys = []
+            #~ self.span_ys = []
             return
         
         # Store selected points into lists
         self.span_xs = selected_xs
-        self.span_ys = selected_ys
+        #~ self.span_ys = selected_ys
         
         # Create rectangle that remains, hightlighting selection
         self.highlight_rect = Rectangle((x_min, -10), width=(x_max-x_min),
             height=200, angle=0, **dict(alpha=0.35, facecolor='lightskyblue'))
         self.ax.add_patch(self.highlight_rect)
         self.selection = True
-        
-        for xp, yp in zip(self.span_xs, self.span_ys):
-            print(xp, yp, sep=',')
-        print()
             
     def onClick(self, event):
         '''Mouse click makes span select go away,
@@ -827,11 +817,12 @@ class Plot():
             if self.node_clicked:
                 self.span.active= False
                 
-                # Del highlight rect if selected node is not highlighted
-                if self.point_index not in self.span_xs:
-                    self.removeHighlight()
+                if self.selection:
+                    # Del highlight rect if selected node is not highlighted
+                    if self.point_index not in self.span_xs:
+                        self.removeHighlight()
                 
-            # Del selection rect when anything non-node is clicked    
+            # Del highlight rect when anything non-node is clicked    
             elif not self.node_clicked:
                 self.removeHighlight()
                 
@@ -842,15 +833,19 @@ class Plot():
         '''Mouse can drag nodes'''
         
         if self.node_clicked and event.inaxes:
+            prev_y_value = self.ys[self.point_index]
+            
             # Point follows mouse on y-axis
-            self.ys[self.point_index] = self.limit_range(event.ydata)
-            # Round to nearest whole degree
-            self.ys[self.point_index] = int(round(self.ys[self.point_index]))
+            self.ys[self.point_index] = int(round(self.limit_range(event.ydata)))
+            node_diff = (self.ys[self.point_index] - prev_y_value)
             
             # Update highlighted point lists
             if self.selection:
-                selected_index = self.span_xs.index(self.point_index)
-                self.span_ys[selected_index] = self.ys[self.point_index]
+                
+                #~ print('node index', self.point_index)
+                for xp in self.span_xs:
+                    if xp != self.point_index:
+                        self.ys[xp] += node_diff
             
             self.update()
     
@@ -862,6 +857,17 @@ class Plot():
         if self.point_index is not None:
             self.node_clicked = False
             self.point_index = None
+    
+    def removeHighlight(self):
+        if self.selection:
+            self.highlight_rect.remove()
+            delattr(self, 'highlight_rect')
+            
+            self.span_xs = []
+            #~ self.span_ys = []
+            self.selection = False
+            
+            self.update()
         
     def update(self):
         '''Re-draw plot after moving a point'''
@@ -871,17 +877,6 @@ class Plot():
         self.drawPlot()
         self.fig.canvas.draw()
         
-    def removeHighlight(self):
-        #~ if hasattr(self, 'highlight_rect'):
-        if self.selection:
-            self.highlight_rect.remove()
-            delattr(self, 'highlight_rect')
-            
-            self.span_xs = []
-            self.span_ys = []
-            self.selection = False
-            
-            self.update()
     
     
     
