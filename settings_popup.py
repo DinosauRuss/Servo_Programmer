@@ -10,10 +10,21 @@ from servo_popups import Popup
 class SettingsPopup(Popup):
     '''Generic popup with notebook to hold various settings pages'''
     
-    def __init__(self):
+    def __init__(self, page):
         super().__init__(title='Settings')
         
+        # To return data from tabs
+        self.which_tab = ''
+        self.values = ()
+        
         self.notebook = ttk.Notebook(self, width=300, height=300)
+        
+        self.addTab(NamePage(self), 'Change Title')
+        self.addTab(TimeAddPage(page, self), 'Add Time')
+        self.addTab(TimeAddPage(page, self), 'Add Time')
+        self.addTab(TimeDelPage(page, self), 'Delete Time')
+        self.addTab(LimitPage(page.plot, self), 'Adjust Limits')
+        self.addTab(ServoDeletePage(page.plot, self), 'Delete Tab')
         
         self.buildPage()
     
@@ -23,15 +34,18 @@ class SettingsPopup(Popup):
     def addTab(self, page, txt='Tab'):    
         self.notebook.add(page, text=txt)
     
+    def show(self):
+        self.wait_window()
+        return ( self.which_tab, self.values )
+    
 
 class NamePage(ttk.Frame):
     '''Change the name/title of plot and tab'''
     
-    def __init__(self, page, parent):
+    def __init__(self, parent):
         super().__init__(parent)
         
         self.parent = parent
-        self.page = page
         self.buildPage()
         
     def buildPage(self): 
@@ -61,25 +75,80 @@ class NamePage(ttk.Frame):
     def update(self, event=None):
         '''Make changes and close popup'''
         
+        # Remove spaces and limit length of name
         name = str(self.name_entry.get()).replace(' ', '')
-        name = name[:10]    # Limit length of name
+        name = name[:10]
         
-        for page in self.page.parent.plot_pages:
-            if name == page.name:
-                messagebox.showerror('Error!', 'Names must be unique')
-                self.parent.destroy()
-                return
         if name:
-            index = self.page.parent.plot_pages.index(self.page) + 1
-            self.page.parent.parent_notebook.tab(index, text=name)
-            self.page.name = name
-            self.page.plot.update()
+            # Send data to parent so it can be returned
+            self.parent.which_tab = self.__class__.__name__
+            self.parent.values = name
+            
             self.parent.destroy()    
             
         else:
             self.parent.destroy()
             
 
+#~ class LimitPage(ttk.Frame):
+    #~ '''Change value of individual node'''
+    
+    #~ def __init__(self, plot, parent):
+        #~ super().__init__(parent)
+        
+        #~ self.parent = parent
+        #~ self.plot = plot
+        #~ self.upper = self.plot.upper_limit
+        #~ self.lower = self.plot.lower_limit
+        
+        #~ self.buildPage()
+        
+    #~ def buildPage(self):
+        #~ main_frame = ttk.Frame(self, padding=5)
+        
+        #~ title = ttk.Label(main_frame, text='Enter New Limits', font=(None, 12))
+        
+        #~ upper_label = ttk.Label(main_frame, text='Upper:')
+        #~ self.upper_entry = ttk.Entry(main_frame, width=6)
+        #~ self.upper_entry.insert(0, self.upper)
+        #~ self.upper_entry.focus()
+        
+        #~ lower_label = ttk.Label(main_frame, text='Lower:')
+        #~ self.lower_entry = ttk.Entry(main_frame, width=6)
+        #~ self.lower_entry.insert(0, self.lower)
+     
+        #~ button = ttk.Button(main_frame, text='OK', command=self.update)
+    
+        #~ main_frame.pack(side=tk.TOP, pady=20)
+        
+        #~ title.grid(columnspan=2, padx=5, pady=5)
+        
+        #~ upper_label.grid(row=1, column=0, sticky=tk.W)
+        #~ lower_label.grid(row=1, column=1, sticky=tk.E)
+        
+        #~ self.upper_entry.grid(row=2, column=0,pady=5, sticky=tk.W)
+        #~ self.lower_entry.grid(row=2, column=1, sticky=tk.E)
+        #~ button.grid(columnspan=2, pady=5)
+            
+    #~ def update(self, event=None):
+        #~ limit = lambda n, n_min, n_max: max(min(n, n_max), n_min)
+        
+        #~ try:
+            #~ self.plot.upper_limit = int(self.upper_entry.get())
+            #~ self.plot.upper_limit = limit(
+                #~ self.plot.upper_limit, 5, 180)
+            
+            #~ self.plot.lower_limit = int(self.lower_entry.get())
+            #~ self.plot.lower_limit = limit(
+                #~ self.plot.lower_limit, 0, self.plot.upper_limit-5)
+            
+            #~ self.plot.update()
+            
+        #~ except Exception as e:
+            #~ print('VAL ERROR: ', e)
+        
+        #~ finally:
+            #~ self.parent.destroy()
 class LimitPage(ttk.Frame):
     '''Change value of individual node'''
     
@@ -209,14 +278,14 @@ class TimeAddPage(ttk.Frame):
                 self.page.parent.max_seconds:
                     
                 messagebox.showerror('Limit Error', 'Total of all routines' +
-                    'must be less than 6 minutes ' + 
+                    'must be less than ' + 
                     '({} seconds)'.format(self.page.parent.max_seconds))
                     
                 self.parent.destroy()
                 return
             
             #~ temp_arr = [0 for i in range(seconds * 2)]
-            temp_arr = [self.page.parent.node_start_val for i in range(seconds * 2)]
+            temp_arr = [self.page.parent.node_default_val for i in range(seconds * 2)]
             
             if self.where_var.get() == 'begin':
                 plot_page.plot.ys = temp_arr + plot_page.plot.ys
