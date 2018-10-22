@@ -1,8 +1,9 @@
 
 import tkinter as tk
-
 from tkinter import messagebox
 from tkinter import ttk
+
+import traceback
 
 from servo_popups import Popup
 
@@ -20,11 +21,13 @@ class SettingsPopup(Popup):
         self.notebook = ttk.Notebook(self, width=300, height=300)
         
         self.addTab(NamePage(self), 'Change Title')
-        self.addTab(TimeAddPage(page, self), 'Add Time')
-        self.addTab(TimeAddPage(page, self), 'Add Time')
-        self.addTab(TimeDelPage(page, self), 'Delete Time')
-        self.addTab(LimitPage(page.plot, self), 'Adjust Limits')
-        self.addTab(ServoDeletePage(page.plot, self), 'Delete Tab')
+        self.addTab(TimeAddPage(self), 'Add Time')
+        self.addTab(TimeDelPage(self), 'Remove Time')
+        self.addTab(LimitPage(page.plot.upper_limit,
+                              page.plot.lower_limit,
+                              self), 'Adjust Limits')
+        self.addTab(ServoDeletePage(page.parent.num_of_servos.get(),
+                                    self), 'Delete Tab')
         
         self.buildPage()
     
@@ -48,13 +51,15 @@ class NamePage(ttk.Frame):
         self.parent = parent
         self.buildPage()
         
-    def buildPage(self): 
+    def buildPage(self):
+        self.name_var = tk.StringVar()
+        
         main_frame = ttk.Frame(self)
         
         title = ttk.Label(main_frame, text='Enter New Name',
             font=(None, 14))
            
-        self.name_entry = ttk.Entry(main_frame)
+        self.name_entry = ttk.Entry(main_frame, textvariable=self.name_var)
         self.name_entry.focus()
         self.name_entry.bind('<Return>', self.update)
         
@@ -76,7 +81,7 @@ class NamePage(ttk.Frame):
         '''Make changes and close popup'''
         
         # Remove spaces and limit length of name
-        name = str(self.name_entry.get()).replace(' ', '')
+        name = str(self.name_var.get()).replace(' ', '')
         name = name[:10]
         
         if name:
@@ -90,96 +95,44 @@ class NamePage(ttk.Frame):
             self.parent.destroy()
             
 
-#~ class LimitPage(ttk.Frame):
-    #~ '''Change value of individual node'''
-    
-    #~ def __init__(self, plot, parent):
-        #~ super().__init__(parent)
-        
-        #~ self.parent = parent
-        #~ self.plot = plot
-        #~ self.upper = self.plot.upper_limit
-        #~ self.lower = self.plot.lower_limit
-        
-        #~ self.buildPage()
-        
-    #~ def buildPage(self):
-        #~ main_frame = ttk.Frame(self, padding=5)
-        
-        #~ title = ttk.Label(main_frame, text='Enter New Limits', font=(None, 12))
-        
-        #~ upper_label = ttk.Label(main_frame, text='Upper:')
-        #~ self.upper_entry = ttk.Entry(main_frame, width=6)
-        #~ self.upper_entry.insert(0, self.upper)
-        #~ self.upper_entry.focus()
-        
-        #~ lower_label = ttk.Label(main_frame, text='Lower:')
-        #~ self.lower_entry = ttk.Entry(main_frame, width=6)
-        #~ self.lower_entry.insert(0, self.lower)
-     
-        #~ button = ttk.Button(main_frame, text='OK', command=self.update)
-    
-        #~ main_frame.pack(side=tk.TOP, pady=20)
-        
-        #~ title.grid(columnspan=2, padx=5, pady=5)
-        
-        #~ upper_label.grid(row=1, column=0, sticky=tk.W)
-        #~ lower_label.grid(row=1, column=1, sticky=tk.E)
-        
-        #~ self.upper_entry.grid(row=2, column=0,pady=5, sticky=tk.W)
-        #~ self.lower_entry.grid(row=2, column=1, sticky=tk.E)
-        #~ button.grid(columnspan=2, pady=5)
-            
-    #~ def update(self, event=None):
-        #~ limit = lambda n, n_min, n_max: max(min(n, n_max), n_min)
-        
-        #~ try:
-            #~ self.plot.upper_limit = int(self.upper_entry.get())
-            #~ self.plot.upper_limit = limit(
-                #~ self.plot.upper_limit, 5, 180)
-            
-            #~ self.plot.lower_limit = int(self.lower_entry.get())
-            #~ self.plot.lower_limit = limit(
-                #~ self.plot.lower_limit, 0, self.plot.upper_limit-5)
-            
-            #~ self.plot.update()
-            
-        #~ except Exception as e:
-            #~ print('VAL ERROR: ', e)
-        
-        #~ finally:
-            #~ self.parent.destroy()
 class LimitPage(ttk.Frame):
     '''Change value of individual node'''
     
-    def __init__(self, plot, parent):
+    def __init__(self, upper_val, lower_val, parent):
         super().__init__(parent)
         
         self.parent = parent
-        self.plot = plot
-        self.upper = self.plot.upper_limit
-        self.lower = self.plot.lower_limit
+        
+        self.upper = upper_val
+        self.lower = lower_val
         
         self.buildPage()
         
     def buildPage(self):
+        self.upper_var = tk.IntVar()
+        self.lower_var = tk.IntVar()
+        self.upper_var.set(self.upper)
+        self.lower_var.set(self.lower)
+        
         main_frame = ttk.Frame(self, padding=5)
         
         title = ttk.Label(main_frame, text='Enter New Limits', font=(None, 12))
         
         upper_label = ttk.Label(main_frame, text='Upper:')
-        self.upper_entry = ttk.Entry(main_frame, width=6)
-        self.upper_entry.insert(0, self.upper)
+        self.upper_entry = ttk.Entry(main_frame,
+            textvariable = self.upper_var,
+            width=6)
         self.upper_entry.focus()
         
         lower_label = ttk.Label(main_frame, text='Lower:')
-        self.lower_entry = ttk.Entry(main_frame, width=6)
-        self.lower_entry.insert(0, self.lower)
+        self.lower_entry = ttk.Entry(main_frame,
+            textvariable=self.lower_var,
+            width=6)
      
         button = ttk.Button(main_frame, text='OK', command=self.update)
     
+    
         main_frame.pack(side=tk.TOP, pady=20)
-        
         title.grid(columnspan=2, padx=5, pady=5)
         
         upper_label.grid(row=1, column=0, sticky=tk.W)
@@ -193,18 +146,21 @@ class LimitPage(ttk.Frame):
         limit = lambda n, n_min, n_max: max(min(n, n_max), n_min)
         
         try:
-            self.plot.upper_limit = int(self.upper_entry.get())
-            self.plot.upper_limit = limit(
-                self.plot.upper_limit, 5, 180)
+            # Prevent limits from going out of servo range,
+            # and from overlapping each other
+            upper_limit = int(self.upper_var.get())
+            upper_limit = limit(upper_limit, 5, 180)
             
-            self.plot.lower_limit = int(self.lower_entry.get())
-            self.plot.lower_limit = limit(
-                self.plot.lower_limit, 0, self.plot.upper_limit-5)
+            lower_limit = int(self.lower_var.get())
+            lower_limit = limit(lower_limit, 0, self.upper-5)
             
-            self.plot.update()
+            # Send data to parent so it can be returned
+            self.parent.which_tab = self.__class__.__name__
+            self.parent.values = (upper_limit, lower_limit)
             
         except Exception as e:
-            print('VAL ERROR: ', e)
+            print('VALUE ERROR: ', e)
+            print(traceback.format_exc())
         
         finally:
             self.parent.destroy()
@@ -212,11 +168,10 @@ class LimitPage(ttk.Frame):
  
 class TimeAddPage(ttk.Frame):
      
-    def __init__(self, page, parent):
+    def __init__(self, parent):
         super().__init__(parent)
          
         self.parent = parent
-        self.page = page
         
         self.buildPage()
        
@@ -234,30 +189,33 @@ class TimeAddPage(ttk.Frame):
         time_label = ttk.Label(entry_frame, text='Seconds   ')
         time_entry = ttk.Entry(entry_frame, width=5,
             textvariable=self.time_entry_var)
-        time_label.pack(side=tk.LEFT)
-        time_entry.pack(side=tk.LEFT)
         
         where = ttk.Frame(main_frame)
         begin = ttk.Radiobutton(where, text = 'Beginning', value='begin',
             variable=self.where_var)
         end = ttk.Radiobutton(where, text= 'End', value='end',
             variable=self.where_var)
-        begin.grid(sticky=tk.W)
-        end.grid(sticky=tk.W)
         
         button_frame = ttk.Frame(main_frame)
         ok_button = ttk.Button(button_frame, text='OK',
             command=self.update)
         cancel_button = ttk.Button(button_frame, text='Cancel',
             command=self.parent.destroy)
-        ok_button.pack(side=tk.LEFT, padx=5)
-        cancel_button.pack(side=tk.RIGHT, padx=5)
         
         main_frame.pack(side=tk.TOP, pady = 20)
         title.grid()
+        
         entry_frame.grid(pady=10)
+        time_label.pack(side=tk.LEFT)
+        time_entry.pack(side=tk.LEFT)
+        
         where.grid(pady=10)
+        begin.grid(sticky=tk.W)
+        end.grid(sticky=tk.W)
+        
         button_frame.grid(pady=10)
+        ok_button.pack(side=tk.LEFT, padx=5)
+        cancel_button.pack(side=tk.RIGHT, padx=5)
         
     def update(self):
         try:
@@ -268,54 +226,18 @@ class TimeAddPage(ttk.Frame):
             self.parent.destroy()
             return
         
-        for plot_page in self.page.parent.plot_pages:
-                
-            # Verify not going over SettingsPage.max_seconds total (Arduino memory limit)
-            temp_length = \
-                ((len(plot_page.plot.ys)-1)/2) + (seconds)
-                
-            if (temp_length * len(self.page.parent.plot_pages)) > \
-                self.page.parent.max_seconds:
-                    
-                messagebox.showerror('Limit Error', 'Total of all routines' +
-                    'must be less than ' + 
-                    '({} seconds)'.format(self.page.parent.max_seconds))
-                    
-                self.parent.destroy()
-                return
-            
-            #~ temp_arr = [0 for i in range(seconds * 2)]
-            temp_arr = [self.page.parent.node_default_val for i in range(seconds * 2)]
-            
-            if self.where_var.get() == 'begin':
-                plot_page.plot.ys = temp_arr + plot_page.plot.ys
-                plot_page.plot.length = len(plot_page.plot.ys)
-                plot_page.plot.xs = [i for i in range(plot_page.plot.length)]
-                
-            elif self.where_var.get() == 'end':
-                plot_page.plot.ys += temp_arr
-                plot_page.plot.length = len(plot_page.plot.ys)
-                plot_page.plot.xs = [i for i in range(plot_page.plot.length)]
-            
-            # Update slider length to scroll along the plot
-            # Upper limit is seconds minus half the length of the plot 'x_window'
-            plot_page.slider['to'] = (plot_page.plot.length // 2) - 10
-            plot_page.slider.set(0)
-            plot_page.parent.num_of_seconds.set(int((len(plot_page.plot.ys)-1)/2))
-            
-            # Redraw the plots
-            plot_page.plot.update()
+        self.parent.which_tab = self.__class__.__name__
+        self.parent.values = (self.where_var.get(), self.time_entry_var.get())
             
         self.parent.destroy()
         
         
 class TimeDelPage(ttk.Frame):
      
-    def __init__(self, page, parent):
+    def __init__(self, parent):
         super().__init__(parent)
          
         self.parent = parent
-        self.page = page
         
         self.buildPage()
        
@@ -333,30 +255,33 @@ class TimeDelPage(ttk.Frame):
         time_label = ttk.Label(entry_frame, text='Seconds   ')
         time_entry = ttk.Entry(entry_frame, width=5,
             textvariable=self.time_entry_var)
-        time_label.pack(side=tk.LEFT)
-        time_entry.pack(side=tk.LEFT)
         
         where = ttk.Frame(main_frame)
         begin = ttk.Radiobutton(where, text = 'Beginning', value='begin',
             variable=self.where_var)
         end = ttk.Radiobutton(where, text= 'End', value='end',
             variable=self.where_var)
-        begin.grid(sticky=tk.W)
-        end.grid(sticky=tk.W)
         
         button_frame = ttk.Frame(main_frame)
         ok_button = ttk.Button(button_frame, text='OK',
             command=self.update)
         cancel_button = ttk.Button(button_frame, text='Cancel',
             command=self.parent.destroy)
-        ok_button.pack(side=tk.LEFT, padx=5)
-        cancel_button.pack(side=tk.RIGHT, padx=5)
         
         main_frame.pack(side=tk.TOP, pady = 20)
         title.grid()
+        
         entry_frame.grid(pady=10)
+        time_label.pack(side=tk.LEFT)
+        time_entry.pack(side=tk.LEFT)
+        
         where.grid(pady=10)
+        begin.grid(sticky=tk.W)
+        end.grid(sticky=tk.W)
+        
         button_frame.grid(pady=10)
+        ok_button.pack(side=tk.LEFT, padx=5)
+        cancel_button.pack(side=tk.RIGHT, padx=5)
         
     def update(self):
         try:
@@ -367,45 +292,18 @@ class TimeDelPage(ttk.Frame):
             self.parent.destroy()
             return
         
-        for plot_page in self.page.parent.plot_pages:
-                
-            nodes_to_remove = self.time_entry_var.get() * 2
-            
-            # Verify plot will still exist
-            if nodes_to_remove >= (len(plot_page.plot.ys) - 1):
-                messagebox.showerror('Error',
-                    'Removing too many seconds')
-                self.parent.destroy()
-                return
-                        
-            if self.where_var.get() == 'begin':
-                del plot_page.plot.ys[:nodes_to_remove]
-                plot_page.plot.length = len(plot_page.plot.ys)
-                plot_page.plot.xs = [i for i in range(plot_page.plot.length)]
-                
-            elif self.where_var.get() == 'end':
-                del plot_page.plot.ys[-nodes_to_remove:]
-                plot_page.plot.length = len(plot_page.plot.ys)
-                plot_page.plot.xs = [i for i in range(plot_page.plot.length)]
-            
-            # Update slider length to scroll along the plot
-            # Upper limit is seconds minus half the length of the plot 'x_window'
-            plot_page.slider['to'] = (plot_page.plot.length // 2) - 10
-            plot_page.slider.set(0)
-            plot_page.parent.num_of_seconds.set(int((len(plot_page.plot.ys)-1)/2))
-            
-            # Redraw the plots
-            plot_page.plot.update()
+        self.parent.which_tab = self.__class__.__name__
+        self.parent.values = ( self.where_var.get(), self.time_entry_var.get() )
             
         self.parent.destroy()
         
 
 class ServoDeletePage(ttk.Frame):
     
-    def __init__(self, plot, parent):
+    def __init__(self, num_servos, parent):
         super().__init__(parent)
         
-        self.plot = plot
+        self.num_servos = num_servos
         self.parent = parent
         
         self.buildPage()
@@ -416,7 +314,7 @@ class ServoDeletePage(ttk.Frame):
         
         title = ttk.Label(main_frame, text='Delete Tab?', font=(None, 14))
         del_button = ttk.Button(button_frame, text='Delete',
-            command=self.deleteTab)
+            command=self.update)
         cancel_button = ttk.Button(button_frame, text='Cancel',
             command=self.parent.destroy)
     
@@ -427,20 +325,19 @@ class ServoDeletePage(ttk.Frame):
         
         main_frame.pack(side=tk.TOP, pady=20)
     
-    def deleteTab(self):
-        if self.plot.parent.parent.num_of_servos.get() > 1:
+    def update(self):
+        if self.num_servos > 1:
             if messagebox.askokcancel('Delete Tab?',
                 'Are you sure you want to delet this tab?'):
                 
-                name = self.plot.parent.name + '_tab'
-                
-                self.plot.parent.parent.plot_pages.remove(self.plot.parent)
-                self.plot.parent.parent.parent_notebook.forget(self.plot.parent)
-                self.plot.parent.parent.num_of_servos.set(len(self.plot.parent.parent.plot_pages))
+                self.parent.which_tab = self.__class__.__name__
                 
                 self.parent.destroy()
             else:
                 self.parent.destroy()
+                
+        else:
+            self.parent.destroy()
             
                 
 

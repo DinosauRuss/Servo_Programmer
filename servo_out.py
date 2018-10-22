@@ -681,27 +681,123 @@ class PlotPage(ttk.Frame):
     def settingsDisplay(self):
         '''Add settings tabs to empty settings popup'''
         
-        #~ popup = SettingsPopup(self)
         tab, values = SettingsPopup(self).show()
-        print(tab, values)
         
         if tab == 'NamePage':
-            name = values
+            self.changeName(values)
             
-            for page in self.parent.plot_pages:
-                if name == page.name:
-                    messagebox.showerror('Error!', 'Names must be unique')
-                    return
+        elif tab == 'LimitPage':
+            self.changeLimits(values)
+        
+        elif tab == 'TimeAddPage':
+            self.addTime(values)
+        
+        elif tab == 'TimeDelPage':
+            self.removeTime(values)
+        
+        elif tab == 'ServoDeletePage':
+            self.deleteServo(values)
+            
+    def changeName(self, values):
+        name = values
+            
+        for page in self.parent.plot_pages:
+            if name == page.name:
+                messagebox.showerror('Error!', 'Names must be unique')
+                return
+                
+        # Change text on tab
+        index = self.parent.plot_pages.index(self) + 1
+        self.parent.parent_notebook.tab(index, text=name)
+        # change title on plot
+        self.name = name
+        self.plot.update()
+            
+    def changeLimits(self, values):
+        self.plot.upper_limit = values[0]
+        self.plot.lower_limit = values[1]
+        
+        self.plot.update()
+    
+    def addTime(self, values):
+        where = values[0]
+        seconds = values[1]
+        
+        for page in self.parent.plot_pages:
+            
+            # Verify not going over SettingsPage.max_seconds total (Arduino memory limit)
+            temp_length = ( (len(page.plot.ys)-1)/2 ) + (seconds)
+                
+            if (temp_length * len(self.parent.plot_pages)) > \
+                self.parent.max_seconds:
                     
-                # Change text on tab
-                index = self.parent.plot_pages.index(self) + 1
-                self.parent.parent_notebook.tab(index, text=name)
-                # Change title on plot
-                self.name = name
-                self.plot.update()
+                messagebox.showerror('Limit Error', 'Total of all routines' +
+                    'must be less than ' + 
+                    '({} seconds)'.format(page.parent.max_seconds))
+                    
+                return
+        
+            temp_arr = [page.parent.node_default_val for i in range(seconds * 2)]
             
-        if tab == 'LimitPage':
-            pass
+            if where == 'begin':
+                page.plot.ys = temp_arr + page.plot.ys
+                page.plot.length = len(page.plot.ys)
+                page.plot.xs = [i for i in range(page.plot.length)]
+                
+            elif where == 'end':
+                page.plot.ys += temp_arr
+                page.plot.length = len(page.plot.ys)
+                page.plot.xs = [i for i in range(page.plot.length)]
+            
+            # Update slider length to scroll along the plot
+            # Upper limit is seconds minus half the length of the plot 'x_window'
+            page.slider['to'] = (page.plot.length // 2) - 10
+            page.slider.set(0)
+            page.parent.num_of_seconds.set(int((len(page.plot.ys)-1)/2))
+            
+            # Redraw the plot
+            page.plot.update()
+    
+    def removeTime(self, values):
+        where = values[0]
+        seconds = values[1]
+        
+        for page in self.parent.plot_pages:
+            
+            nodes_to_remove = seconds * 2
+            
+            # Verify plot will still exist
+            if nodes_to_remove >= (len(page.plot.ys) - 1):
+                messagebox.showerror('Error',
+                    'Removing too many seconds')
+                return
+                        
+            if where == 'begin':
+                del page.plot.ys[:nodes_to_remove]
+                page.plot.length = len(page.plot.ys)
+                page.plot.xs = [i for i in range(page.plot.length)]
+                
+            elif where == 'end':
+                del page.plot.ys[-nodes_to_remove:]
+                page.plot.length = len(page.plot.ys)
+                page.plot.xs = [i for i in range(page.plot.length)]
+            
+            # Update slider length to scroll along the plot
+            # Upper limit is seconds minus half the length of the plot 'x_window'
+            page.slider['to'] = (page.plot.length // 2) - 10
+            page.slider.set(0)
+            #~ page.parent.num_of_seconds.set(int((len(page.plot.ys)-1)/2))
+            page.parent.num_of_seconds.set( int((page.plot.length)-1) /2)
+            
+            # Redraw the plots
+            page.plot.update()
+    
+    def deleteServo(self, values):
+        name = self.name + '_tab'
+                
+        self.parent.plot_pages.remove(self)
+        self.parent.parent_notebook.forget(self)
+        self.parent.num_of_servos.set(len(self.parent.plot_pages))
         
 
 class Plot():
