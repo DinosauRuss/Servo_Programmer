@@ -100,7 +100,7 @@ class SettingsPage(ttk.Frame):
     
     max_seconds = 360
     max_servos = 8
-    node_start_val = 90
+    node_default_val = 90
     
     def __init__(self, parent_notebook, parent):
         super().__init__()
@@ -127,7 +127,8 @@ class SettingsPage(ttk.Frame):
         main_frame.pack(expand=1, fill=tk.BOTH)
         
         # Use Shift+d to change max seconds/servos
-        main_frame.bind("<Shift-D>", lambda event: DevPopup(self))
+        #~ main_frame.bind("<Shift-D>", lambda event: DevPopup(self))
+        main_frame.bind("<Shift-D>", lambda event: self.changeDefaults())
         main_frame.bind("<Button-1>", lambda event: main_frame.focus_set())
         
         # --- Left side Frame ---
@@ -224,13 +225,49 @@ class SettingsPage(ttk.Frame):
         self.num_of_servos.set(0)
         self.button_entry_val.set('None')
     
+    def changeDefaults(self):
+        '''Change class attribute defaults with popup'''
+        
+        cls = SettingsPage
+        
+        (ok_cancel, new_max_seconds, new_max_servos, new_default_val) = \
+            DevPopup(cls.max_seconds, cls.max_servos, cls.node_default_val).show()
+        
+        # If ok button closed popup
+        if ok_cancel:    
+            current_total_routine_seconds =\
+                self.num_of_seconds.get() * self.num_of_servos.get()
+            
+            if new_max_seconds < current_total_routine_seconds:
+                messagebox.showerror('Error', 'New max runtime is less than\n'\
+                    + 'current routine runtime')
+                return
+                
+            if new_max_servos < self.num_of_servos.get():
+                messagebox.showerror('Error', 'New max servos is less than\n'\
+                    + 'current number of servos')
+                self.destroy()
+                return
+
+            cls.max_seconds = new_max_seconds
+            cls.max_servos = new_max_servos
+            cls.node_default_val =\
+                self.constrain(new_default_val, 0, 180)
+            
+            self.seconds_label_var.set('Routine length (in seconds)\
+                \n(1-{}):'.format(new_max_seconds))
+            self.servo_label_var.set(\
+                'Number of servos (1-{})'.format(new_max_servos))
+                
+        # If cancel button closed popup        
+        else:
+            return
+    
     def generatePlots(self):
         '''
         Generate specified number of Plot tabs each containing a plot
         of the specified routine length
         '''
-        
-        SettingsPage.initial_load_flag = True
         
         if SettingsPage.load_flag:
             self.loadServos()
@@ -239,15 +276,15 @@ class SettingsPage(ttk.Frame):
             # Generate tabs/plots from inputs on Settings Page
             try: 
                 # Check inputs for errors
-                limit = lambda n, n_min, n_max: max(min(n, n_max), n_min)
+                #~ constrain = lambda n, n_min, n_max: max(min(n, n_max), n_min)
                 
                 # Routine between 1 and (self.max_seconds)
                 temp_secs= self.num_of_seconds.get()
-                self.num_of_seconds.set(limit(temp_secs, 1, SettingsPage.max_seconds))
+                self.num_of_seconds.set(self.constrain(temp_secs, 1, SettingsPage.max_seconds))
                 
                 # Maximum of SettingsPage.max_servos
                 temp_servos = self.num_of_servos.get()
-                self.num_of_servos.set(limit(temp_servos, 1, SettingsPage.max_servos))
+                self.num_of_servos.set(self.constrain(temp_servos, 1, SettingsPage.max_servos))
                 
                 if (self.num_of_servos.get() * \
                         self.num_of_seconds.get()) > SettingsPage.max_seconds:
@@ -272,6 +309,8 @@ class SettingsPage(ttk.Frame):
                     
                     self.parent_notebook.add(plotPage, text=plot_title)
                     SettingsPage.plot_pages.append(plotPage)
+                    
+                    SettingsPage.initial_load_flag = True
         
         # Change button states after loading or generating new plots
         self.generate_plots_button['state']='disabled'
@@ -332,8 +371,7 @@ class SettingsPage(ttk.Frame):
             else:
                 self.pins.invoke()
             self.toggle_btn_checkbox()
-            #~ self.num_of_seconds.set(self.settings['seconds'])
-        self.num_of_seconds.set(self.settings['seconds'])
+            self.num_of_seconds.set(self.settings['seconds'])
             
         
         # Generate tabs/plots using loaded data
@@ -361,9 +399,9 @@ class SettingsPage(ttk.Frame):
                 # Add time to new loaded plots to match length of current plots
                 for page in self.settings['plot_pages']:
                     page[2] +=\
-                        [SettingsPage.node_start_val for i in range(nodes_to_add)]
+                        [SettingsPage.node_default_val for i in range(nodes_to_add)]
                     
-        elif loaded_seconds > current_seconds:
+        elif current_seconds < loaded_seconds:
             if (loaded_seconds * new_num_servos) > SettingsPage.max_seconds:
                 messagebox.showerror('Error', 'Loading too many seconds')
                 return
@@ -374,7 +412,7 @@ class SettingsPage(ttk.Frame):
                 # Add time to current plots to match length of new loaded plots
                 for page in SettingsPage.plot_pages:
                     page.plot.ys +=\
-                        [SettingsPage.node_start_val for i in range(nodes_to_add)]
+                        [SettingsPage.node_default_val for i in range(nodes_to_add)]
                     
                     page.plot.length = len(page.plot.ys)
                     page.plot.xs = [i for i in range(page.plot.length)]
@@ -401,6 +439,8 @@ class SettingsPage(ttk.Frame):
             plotPage.plot.update()
         
         self.num_of_servos.set(new_num_servos)
+        
+        SettingsPage.initial_load_flag = True
     
     def outputSketch(self):
         '''
@@ -527,7 +567,7 @@ class SettingsPage(ttk.Frame):
             print(e)
 
     def loadData(self):
-        '''Loads data from previous save'''
+        '''Loads all data from a previous session'''
         
         file_name = fd.askopenfilename(
                 initialdir=os.path.join(os.path.dirname(__file__)),
@@ -543,6 +583,12 @@ class SettingsPage(ttk.Frame):
             self.generatePlots()
             
             del self.settings
+    
+    @staticmethod
+    def constrain(n, n_min, n_max):
+        '''Constrain value n between a min and max'''
+        
+        return max(min(n, n_max), n_min)
                 
     @staticmethod
     def prettyOutput(arr):
@@ -592,14 +638,14 @@ class PlotPage(ttk.Frame):
         self.plot = Plot(self, self.parent.num_of_seconds.get(), self.plot_num)
         
         # Drawing area for the graph
-        canvas = FigureCanvasTkAgg(self.plot.fig, master=self)
-        # Bind mouse events to canvas to change data
-        canvas.mpl_connect('pick_event', self.plot.onNodeClick)
-        canvas.mpl_connect('button_release_event', self.plot.onRelease)
-        canvas.mpl_connect('motion_notify_event', self.plot.onMotion)
+        self.canvas = FigureCanvasTkAgg(self.plot.fig, master=self)
+        # Bind mouse events to self.canvas to change data
+        self.canvas.mpl_connect('pick_event', self.plot.onNodeClick)
+        self.canvas.mpl_connect('button_release_event', self.plot.onRelease)
+        self.canvas.mpl_connect('motion_notify_event', self.plot.onMotion)
         
-        canvas.mpl_connect('button_press_event', self.plot.onClick)
-        canvas.mpl_connect('key_release_event', self.plot.onDelKey)
+        self.canvas.mpl_connect('button_press_event', self.plot.onClick)
+        self.canvas.mpl_connect('key_release_event', self.plot.onDelKey)
         
         # Need to create SpanSelector widget after canvas is created
         self.plot.span = self.plot.createSpanSelector()
@@ -619,10 +665,9 @@ class PlotPage(ttk.Frame):
             
         self.settings_button = ttk.Button(button_frame, text='Settings',
             command=self.settingsDisplay)
-            
         
         # Grid widgets into tab
-        canvas.get_tk_widget().grid(columnspan=3)
+        self.canvas.get_tk_widget().grid(columnspan=3)
         self.slider.grid(columnspan=3)
         
         pin_assign_frame.grid(sticky=tk.W)
@@ -636,13 +681,28 @@ class PlotPage(ttk.Frame):
     def settingsDisplay(self):
         '''Add settings tabs to empty settings popup'''
         
-        popup = SettingsPopup()
+        #~ popup = SettingsPopup(self)
+        tab, values = SettingsPopup(self).show()
+        print(tab, values)
         
-        popup.addTab(NamePage(self, popup), 'Change Title')
-        popup.addTab(TimeAddPage(self, popup), 'Add Time')
-        popup.addTab(TimeDelPage(self, popup), 'Delete Time')
-        popup.addTab(LimitPage(self.plot, popup), 'Adjust Limits')
-        popup.addTab(ServoDeletePage(self.plot, popup), 'Delete Tab')
+        if tab == 'NamePage':
+            name = values
+            
+            for page in self.parent.plot_pages:
+                if name == page.name:
+                    messagebox.showerror('Error!', 'Names must be unique')
+                    return
+                    
+                # Change text on tab
+                index = self.parent.plot_pages.index(self) + 1
+                self.parent.parent_notebook.tab(index, text=name)
+                # Change title on plot
+                self.name = name
+                self.plot.update()
+            
+        if tab == 'LimitPage':
+            pass
+        
 
 class Plot():
     '''
@@ -673,7 +733,7 @@ class Plot():
         self.ax = self.fig.add_subplot(111)
         
         self.xs = [i for i in range(self.length)]
-        self.ys = [self.parent.parent.node_start_val for i in self.xs]
+        self.ys = [self.parent.parent.node_default_val for i in self.xs]
         
         # To hold values from span selector
         self.span_xs = []
@@ -785,10 +845,10 @@ class Plot():
     def spanSelect(self, x_min, x_max):
         '''Callback for span selector'''
         
-        limit = lambda n, n_min, n_max: max(min(n, n_max), n_min)
+        constrain = lambda n, n_min, n_max: max(min(n, n_max), n_min)
         
-        xmin = limit(ceil(x_min), 0, len(self.xs))
-        xmax = limit(ceil(x_max), 0, len(self.xs))
+        xmin = constrain(ceil(x_min), 0, len(self.xs))
+        xmax = constrain(ceil(x_max), 0, len(self.xs))
         
         selected_xs = self.xs[xmin:xmax]
         selected_ys = self.ys[xmin:xmax]
@@ -809,6 +869,10 @@ class Plot():
     def onClick(self, event):
         '''Mouse click makes span select go away,
            resets selection arrays'''
+        
+        # Some events cause canvas to lose focus, causing missed events
+        # Bring focus back to canvas 
+        self.parent.canvas._tkcanvas.focus_set()
         
         if event.button == 1:
             # If moving a node, deactivate spanselector
@@ -871,10 +935,10 @@ class Plot():
     def onDelKey(self, event):
         '''Deletes selected nodes and adds same number of nodes at the default
            value to the end, to maintain routine length '''
-        
+           
         if self.selection and event.key=='delete':
-            answer = messagebox.askyesno('All or None',
-                message='Delete from all plots or only selected?')
+            answer = messagebox.askyesno('Delete Nodes',
+                message='Delete nodes?')
                 
             if answer:
                 # Delete selected nodes
@@ -883,7 +947,7 @@ class Plot():
                 
                 # Add default nodes to end to maintain routine length
                 self.xs += [0 for i in self.span_xs]
-                self.ys += [self.parent.parent.node_start_val for i in self.span_xs]
+                self.ys += [self.parent.parent.node_default_val for i in self.span_xs]
                 # Re-number xs
                 self.xs = [index for index, val in enumerate(self.xs)]
                 

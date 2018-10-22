@@ -56,54 +56,8 @@ class AboutPopup(Popup):
         button_frame.pack(side=tk.BOTTOM, pady=10)
 
 
-#~ class ValuePopup(Popup):
-    #~ '''Change value of individual node'''
-    
-    #~ def __init__(self, plot, node_index, title='Change Value', geometry='240x125'):
-        #~ super().__init__(title, geometry)
-        
-        #~ self.plot = plot
-        #~ self.index = node_index
-        
-        #~ self.buildPage()
-        
-    #~ def buildPage(self):
-        #~ self.entry_value = tk.IntVar()
-        #~ self.entry_value.set(self.plot.ys[self.index])
-        
-        #~ main_frame = ttk.Frame(self, padding=5)
-        
-        #~ label = ttk.Label(main_frame, text='Enter a new value', font=(None, 12))
-        #~ self.new_val_entry = ttk.Entry(main_frame, width=6,
-            #~ textvariable=self.entry_value)
-        #~ self.new_val_entry.focus()
-        #~ self.new_val_entry.bind('<Return>', self.update)
-        
-        #~ ok_button = ttk.Button(main_frame, text='OK', command=self.update)
-        #~ cancel_button = ttk.Button(main_frame, text='Cancel',
-            #~ command=self.destroy)
-    
-        #~ main_frame.pack(fill=tk.BOTH, expand=1)
-        
-        #~ label.pack(padx=5, pady=5)
-        #~ self.new_val_entry.pack(pady=5)
-        #~ ok_button.pack(pady=5, side=tk.LEFT)
-        #~ cancel_button.pack(pady=5, side=tk.RIGHT)
-            
-    #~ def update(self, event=None):
-        
-        #~ try:
-            #~ self.plot.ys[self.index] = self.plot.limit_range(self.entry_value.get())
-            #~ self.plot.update()
-            
-        #~ except Exception as e:
-            #~ print('VAL ERROR: ', e)
-        
-        #~ finally:
-            #~ self.destroy()
 class ValuePopup(Popup):
-    '''Returns new value for a node,
-       and ok(True) or cancel(False) button press'''
+    '''Returns new value for a node'''
     
     def __init__(self, current_value, title='Change Value', geometry='240x125'):
         super().__init__(title, geometry)
@@ -157,8 +111,7 @@ class ValuePopup(Popup):
 
         
 class HelpPopup(Popup):
-    """A simple text viewer dialog for IDLE
-    """
+    """Text viewer dialog that shows help file"""
     def __init__(self, title='Help', filename=None):
         
         super().__init__(title)
@@ -204,10 +157,14 @@ class HelpPopup(Popup):
                 
 class DevPopup(Popup):
      
-    def __init__(self, settings_page):
-        super().__init__(title='Dev Page', geometry='250x100')
+    def __init__(self, seconds, servos, default_val):
+        super().__init__(title='Dev Page', geometry='250x150')
          
-        self.settings_page = settings_page
+        self.seconds = seconds
+        self.servos = servos
+        self.default_val = default_val
+        
+        self.send_data = False
          
         self.buildPage()
          
@@ -215,8 +172,10 @@ class DevPopup(Popup):
         
         self.new_seconds_var = tk.IntVar()
         self.new_servos_var = tk.IntVar()
-        self.new_seconds_var.set(self.settings_page.__class__.max_seconds)
-        self.new_servos_var.set(self.settings_page.__class__.max_servos)
+        self.new_node_default_val = tk.IntVar()
+        self.new_seconds_var.set(self.seconds)
+        self.new_servos_var.set(self.servos)
+        self.new_node_default_val.set(self.default_val)
         
         main_frame = ttk.Frame(self, padding=5)
         
@@ -226,6 +185,11 @@ class DevPopup(Popup):
         
         servos_label = ttk.Label(main_frame, text='Total number of servos')
         servos_entry = ttk.Entry(main_frame, textvariable=self.new_servos_var,
+            width=6)
+        
+        default_label = ttk.Label(main_frame, text='Servo default angle')
+        default_entry = ttk.Entry(main_frame,
+            textvariable=self.new_node_default_val,
             width=6)
         
         button_frame = ttk.Frame(main_frame)    
@@ -239,6 +203,8 @@ class DevPopup(Popup):
         seconds_entry.grid(row=0, column=1)
         servos_label.grid(row=1, column=0)
         servos_entry.grid(row=1, column=1)
+        default_label.grid(row=2, column=0)
+        default_entry.grid(row=2, column=1)
         
         button_frame.grid(columnspan=2, pady=10)
         ok_button.pack(side=tk.LEFT)
@@ -246,30 +212,28 @@ class DevPopup(Popup):
         
     def update(self):
         
-        current_total_servos = self.settings_page.num_of_servos.get()
-        current_total_seconds =\
-            self.settings_page.num_of_seconds.get() * current_total_servos
-        
-        if self.new_seconds_var.get() < current_total_seconds:
-            messagebox.showerror('Error', 'New max runtime is less than\n'\
-                + 'current routine runtime')
+        try:
+            self.new_seconds_var.get()
+            self.new_servos_var.get() 
+            self.new_node_default_val.get()           
+        except Exception as e:
+            print('VALUE ERROR: ', e)
+            traceback.print_exc()
+        else:
+            self.send_data = True
+        finally:
             self.destroy()
-            return
-        if self.new_servos_var.get() < current_total_servos:
-            messagebox.showerror('Error', 'New max servos is less than\n'\
-                + 'current number of servos')
-            self.destroy()
-            return
-
-        self.settings_page.__class__.max_seconds = self.new_seconds_var.get()
-        self.settings_page.__class__.max_servos = self.new_servos_var.get()
         
-        self.settings_page.seconds_label_var.set('Routine length (in seconds)\
-            \n(1-{}):'.format(self.settings_page.max_seconds))
-        self.settings_page.servo_label_var.set(\
-            'Number of servos (1-{})'.format(self.settings_page.max_servos))
+    def show(self):
+        self.wait_window()
         
-        self.destroy()
+        if self.send_data:
+            return ( True,
+                     self.new_seconds_var.get(),
+                     self.new_servos_var.get(),
+                     self.new_node_default_val.get() )
+        else:
+            return ( False, None, None, None )
     
     
 
