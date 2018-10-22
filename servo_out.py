@@ -599,7 +599,7 @@ class PlotPage(ttk.Frame):
         canvas.mpl_connect('motion_notify_event', self.plot.onMotion)
         
         canvas.mpl_connect('button_press_event', self.plot.onClick)
-        canvas.mpl_connect('motion_notify_event', self.plot.onMotion)
+        canvas.mpl_connect('key_release_event', self.plot.onDelKey)
         
         # Need to create SpanSelector widget after canvas is created
         self.plot.span = self.plot.createSpanSelector()
@@ -677,7 +677,6 @@ class Plot():
         
         # To hold values from span selector
         self.span_xs = []
-        #~ self.span_ys = []
         self.selection = False
         
         
@@ -687,6 +686,7 @@ class Plot():
     def updatePos(self, *args):
         '''Read the scale to move plot viewing area,
            args are a tuple of scale value automatically passed in'''
+           
         self.scale_pos = self.scale.get()
         self.update()
     
@@ -795,12 +795,10 @@ class Plot():
         
         if len(selected_xs) <= 1:
             self.span_xs = []
-            #~ self.span_ys = []
             return
         
         # Store selected points into lists
         self.span_xs = selected_xs
-        #~ self.span_ys = selected_ys
         
         # Create rectangle that remains, hightlighting selection
         self.highlight_rect = Rectangle((x_min, -10), width=(x_max-x_min),
@@ -859,15 +857,39 @@ class Plot():
             self.point_index = None
     
     def removeHighlight(self):
+        '''Removes highlight rect from plot'''
+        
         if self.selection:
             self.highlight_rect.remove()
             delattr(self, 'highlight_rect')
             
             self.span_xs = []
-            #~ self.span_ys = []
             self.selection = False
             
             self.update()
+    
+    def onDelKey(self, event):
+        '''Deletes selected nodes and adds same number of nodes at the default
+           value to the end, to maintain routine length '''
+        
+        if self.selection and event.key=='delete':
+            answer = messagebox.askyesno('All or None',
+                message='Delete from all plots or only selected?')
+                
+            if answer:
+                # Delete selected nodes
+                del self.xs[self.span_xs[0]: self.span_xs[-1]+1]
+                del self.ys[self.span_xs[0]: self.span_xs[-1]+1]
+                
+                # Add default nodes to end to maintain routine length
+                self.xs += [0 for i in self.span_xs]
+                self.ys += [self.parent.parent.node_start_val for i in self.span_xs]
+                # Re-number xs
+                self.xs = [index for index, val in enumerate(self.xs)]
+                
+                self.removeHighlight()
+                
+                self.update()
         
     def update(self):
         '''Re-draw plot after moving a point'''
