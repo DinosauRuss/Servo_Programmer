@@ -607,15 +607,7 @@ class PlotPage(ttk.Frame):
     def buildPage(self):
         '''Layout widgets for the tab'''
         
-        self.pin_num = tk.IntVar()
-        
-        # To scroll along the plot
-        # Needs to be created before Plot
-        # Upper limit is seconds minus half the length of the plot 'x_window'
-        self.slider = ttk.Scale(self, orient=tk.HORIZONTAL,
-            to=self.parent.num_of_seconds.get()-10,
-            length=self.parent.parent_notebook.winfo_width())
-        
+        self.pin_num = tk.IntVar()        
         
         # ----- Matplotlib Plot -----
         
@@ -632,12 +624,19 @@ class PlotPage(ttk.Frame):
         self.canvas.mpl_connect('button_press_event', self.plot.onClick)
         self.canvas.mpl_connect('key_release_event', self.plot.onDelKey)
         
-        # Need to create SpanSelector widget after canvas is created
+        # Create SpanSelector widget after canvas is created
         self.plot.span = self.plot.createSpanSelector()
         
         # ----- End of Matplotlib plot -----
         
         
+        # To scroll along the plot
+        # Upper limit is seconds minus half the length of the plot 'x_window'
+        self.slider = ttk.Scale(self, orient=tk.HORIZONTAL,
+            to=self.parent.num_of_seconds.get()-10,
+            length=self.parent.parent_notebook.winfo_width(),
+            command=self.updateSliderPos)
+            
         pin_assign_frame = ttk.Frame(self, padding=10)
         pin_label = ttk.Label(pin_assign_frame, text='Pin # or address: ')
         self.pin_entry = ttk.Entry(
@@ -662,6 +661,10 @@ class PlotPage(ttk.Frame):
         button_frame.grid(row=2, column=2, sticky=tk.E)
         
         self.settings_button.pack(padx=5, side=tk.RIGHT)
+
+    def updateSliderPos(self, event):
+        self.plot.scale_pos = self.slider.get()
+        self.plot.update()
 
     def settingsDisplay(self):
         '''Add settings tabs to empty settings popup'''
@@ -793,8 +796,6 @@ class Plot():
     
     def __init__(self, parent, seconds, num):
         self.parent = parent
-        self.scale = self.parent.slider
-        self.scale['command'] = self.updatePos
         
         self.scale_pos = 0
         self.num = num                 # Which number servo, for plot title
@@ -823,13 +824,6 @@ class Plot():
         
         self.setPlot()
         self.drawPlot()
-       
-    def updatePos(self, *args):
-        '''Read the scale to move plot viewing area,
-           args are a tuple of scale value automatically passed in'''
-           
-        self.scale_pos = self.scale.get()
-        self.update()
     
     def setPlot(self):
         '''Elements of the plot which do not need to be redrawn every update '''
