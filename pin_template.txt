@@ -42,7 +42,80 @@ const byte* VALUES_ARRAY[] = { {% for tabName in list_of_names %}{{tabName}}_arr
 {% if button != 'None' %}
 // Button to start routine
 const byte BUTTON_PIN = {{button}};
-{% endif %}
+
+int state = 0;
+unsigned long time_check = 0;
+unsigned long time_start = 0;
+const int bounce_delay = 20;
+const int timeout_delay = 1000;
+
+void debounceButton()
+{
+  boolean button_val = digitalRead(BUTTON_PIN);
+
+  //State Machine Section
+  switch ( state )
+  {
+    case 0: // WAIT
+      // Wait for the switch to go low
+      if ( button_val == LOW )
+      {
+        time_start = millis();
+        state = 1;
+      }
+      break;
+
+    case 1: // ARMED
+      // Check to see if the proper has delay has passed.  If a bounce occures reset
+      time_check = millis();
+      
+      // Reset if button bounces back high
+      if ( button_val == HIGH )
+      {
+        state = 0;
+      }
+      else if ( time_check - time_start > bounce_delay )
+      {
+        state = 2;
+      }
+      break;
+
+    case 2:
+      time_check = millis();
+      // If switch is HIGH button was pushed and released
+      if ( button_val == HIGH )
+      {
+        state = 3;
+      }
+      // Long press 
+      else if ( time_check - time_start > timeout_delay )
+      {
+        Serial.println( "long press" );
+        state = 4; 
+      }
+      break;
+
+    case 3:
+      // Do something and reset the State Machine
+      
+      // Something
+      Serial.println(F("Routine Started"));
+      routine(SERVO_ARR, NUM_SERVOS, VALUES_ARRAY, INTERVAL, ARRAY_LENGTH);
+      Serial.println(F("Exiting routine"));
+
+      state = 0;
+      break;
+     
+    case 4:
+      // Button held low too long
+      // Wait for it to go back high, then reset
+      if ( button_val == HIGH )
+      {
+       state = 0; 
+      }
+  } 
+}{% endif %}
+
 
 void routine(Servo arr_of_servos[], byte num_of_servos, const byte* arr_of_valueArrays[], byte interval, unsigned int length)
 {
@@ -94,10 +167,6 @@ void routine(Servo arr_of_servos[], byte num_of_servos, const byte* arr_of_value
   }
 
   Serial.println(F("Routine has ended"));
-  float total_secs = (end_millis - start_millis) / 1000;
-  Serial.print(F("Total seconds: "));
-  Serial.println(total_secs);
-
 }
 
 
@@ -135,17 +204,8 @@ void setup()
 void loop() {% if button != 'None' %}
 {
   // Button press starts servo routine
-  if ((digitalRead(BUTTON_PIN) == LOW))
-  {
-    long now = millis();
-    while ((millis() - now) < 50){}  // 50 ms delay to debounce
-    if ((digitalRead(BUTTON_PIN) == LOW))
-    {
-      Serial.println(F("Routine Started"));
-      routine(SERVO_ARR, NUM_SERVOS, VALUES_ARRAY, INTERVAL, ARRAY_LENGTH);
-      Serial.println(F("Exiting routine"));
-    }
-  }
+  debounceButton();
+
 {% else %}{
   // Do something with routine function:
     // routine(SERVO_ARR, NUM_SERVOS, VALUES_ARRAY, INTERVAL, ARRAY_LENGTH);

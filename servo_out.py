@@ -161,10 +161,6 @@ class SettingsPage(ttk.Frame):
         self.generate_plots_button.grid(padx=25, pady=25, row=1, column=2,
             rowspan=2)
             
-        self.add_servo_button = ttk.Button(left, text='Add Servo',
-            state='disabled', command=self.addServo)
-        self.add_servo_button.grid(pady=50)
-        
         # --- Right side Frame ---
         right = ttk.Frame(main_frame)
         right.pack(anchor=tk.CENTER)
@@ -197,14 +193,6 @@ class SettingsPage(ttk.Frame):
         self.output_button = ttk.Button(right, text='Output Sketch', width=15,
             state='disabled', command=self.outputSketch)
         self.output_button.grid(pady=50, columnspan=2)
-        
-        self.save_button = ttk.Button(right, text='Save', state='disabled',
-            command=self.saveData)
-        self.save_button.grid(sticky=tk.W)
-
-        self.load_button = ttk.Button(right, text='Load',
-            command=self.loadData)
-        self.load_button.grid(row=4, column=1)
         
 
         self.resetEntries()
@@ -316,10 +304,7 @@ class SettingsPage(ttk.Frame):
         self.generate_plots_button['state']='disabled'
         self.seconds_entry['state']='disabled'
         self.servo_total_entry['state']='disabled'
-        self.add_servo_button['state'] = 'normal'
         
-        self.save_button['state'] = 'normal'
-        self.load_button['state'] = 'disabled'
         self.output_button['state'] = 'normal'
         
         # Change main menubar states
