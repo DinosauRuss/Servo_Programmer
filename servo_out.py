@@ -193,7 +193,7 @@ class SettingsPage(ttk.Frame):
         self.output_button = ttk.Button(right, text='Output Sketch', width=15,
             state='disabled', command=self.outputSketch)
         self.output_button.grid(pady=50, columnspan=2)
-        
+    
 
         self.resetEntries()
     
@@ -304,7 +304,7 @@ class SettingsPage(ttk.Frame):
         self.generate_plots_button['state']='disabled'
         self.seconds_entry['state']='disabled'
         self.servo_total_entry['state']='disabled'
-        
+
         self.output_button['state'] = 'normal'
         
         # Change main menubar states
@@ -746,7 +746,7 @@ class PlotPage(ttk.Frame):
     def removeTime(self, values):
         where = values[0]
         seconds = values[1]
-        
+
         for page in self.parent.plot_pages:
             
             nodes_to_remove = seconds * 2

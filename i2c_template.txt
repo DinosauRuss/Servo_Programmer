@@ -206,6 +206,7 @@ void loop() {% if button != 'None' %}
 {
   // Button press starts servo routine
   debounceButton();
+
 {% else %}{
   // Do something with routine function:
     // routine(SERVO_ARR, NUM_SERVOS, VALUES_ARRAY, INTERVAL, ARRAY_LENGTH);
